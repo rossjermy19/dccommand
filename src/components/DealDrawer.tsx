@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PIPELINE_STAGES } from '@/lib/types';
 import { DealTagBadge } from './DealTagBadge';
+import { ClosedLostModal } from './ClosedLostModal';
 import { 
   X, 
   ExternalLink, 
@@ -20,7 +21,8 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
-  Bell
+  Bell,
+  Archive
 } from 'lucide-react';
 
 interface DealDrawerProps {
@@ -115,8 +117,14 @@ export function DealDrawer({
     }
   };
 
+  const [isClosedLostModalOpen, setIsClosedLostModalOpen] = useState(false);
+
   const handleStageChange = async (newStage: string) => {
     if (!deal || newStage === currentStage) return;
+    if (newStage === 'closedlost') {
+      setIsClosedLostModalOpen(true);
+      return;
+    }
     setIsUpdatingStage(true);
     setCurrentStage(newStage);
     try {
@@ -465,6 +473,15 @@ export function DealDrawer({
                 <span>Aligned Story</span>
               </button>
             )}
+
+            <button
+              onClick={() => setIsClosedLostModalOpen(true)}
+              className="flex items-center space-x-1.5 text-xs font-bold bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg transition"
+              title="Mark deal as Closed Lost with reason"
+            >
+              <Archive className="h-3.5 w-3.5 text-rose-600" />
+              <span>Mark Lost</span>
+            </button>
           </div>
         </div>
 
@@ -1021,6 +1038,16 @@ export function DealDrawer({
           )}
         </div>
       </div>
+
+      <ClosedLostModal
+        isOpen={isClosedLostModalOpen}
+        deal={deal}
+        onClose={() => setIsClosedLostModalOpen(false)}
+        onSuccess={() => {
+          onRefreshDeals?.();
+          onClose();
+        }}
+      />
     </div>
   );
 }

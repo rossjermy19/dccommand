@@ -17,9 +17,11 @@ import {
   ExternalLink,
   Kanban,
   Zap,
-  Filter
+  Filter,
+  Archive
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
+import { ClosedLostModal } from './ClosedLostModal';
 
 interface DailyMissionControlProps {
   deals: Deal[];
@@ -57,6 +59,7 @@ export function DailyMissionControl({
   const [schedulingDealId, setSchedulingDealId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string>('');
   const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
+  const [closedLostDeal, setClosedLostDeal] = useState<Deal | null>(null);
 
   // Generate dynamic missions from deals
   const rawMissions = useMemo<MissionItem[]>(() => {
@@ -515,6 +518,16 @@ export function DailyMissionControl({
                       <span>Meeting Booked</span>
                     </button>
 
+                    {/* Resolution Action 5: Quick Mark Lost */}
+                    <button
+                      onClick={() => setClosedLostDeal(mission.deal)}
+                      className="flex items-center space-x-1.5 bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 hover:border-rose-200 transition"
+                      title="Mark deal as Closed Lost in HubSpot"
+                    >
+                      <Archive className="h-3.5 w-3.5 text-rose-500" />
+                      <span>Lost</span>
+                    </button>
+
                     {/* Timeline Drawer */}
                     <button
                       onClick={() => onSelectDeal(mission.deal)}
@@ -539,6 +552,22 @@ export function DailyMissionControl({
           })}
         </div>
       )}
+
+      <ClosedLostModal
+        isOpen={!!closedLostDeal}
+        deal={closedLostDeal}
+        onClose={() => setClosedLostDeal(null)}
+        onSuccess={() => {
+          if (closedLostDeal) {
+            clearMission(`stalled_${closedLostDeal.id}`);
+            clearMission(`action_due_${closedLostDeal.id}`);
+            clearMission(`new_${closedLostDeal.id}`);
+            clearMission(`aligned_${closedLostDeal.id}`);
+          }
+          setClosedLostDeal(null);
+          onRefreshDeals();
+        }}
+      />
     </div>
   );
 }

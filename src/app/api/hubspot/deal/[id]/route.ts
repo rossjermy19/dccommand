@@ -35,10 +35,10 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { stage, subSource } = body;
+    const { stage, subSource, closedLostReason, closedLostNotes } = body;
 
     if (stage) {
-      await updateDealStage(dealId, stage);
+      await updateDealStage(dealId, stage, closedLostReason, closedLostNotes);
     }
 
     if (subSource !== undefined) {

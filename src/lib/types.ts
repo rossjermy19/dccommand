@@ -114,6 +114,7 @@ export const PIPELINE_STAGES = [
   { id: 'decisionmakerboughtin', label: 'Committed' },
   { id: 'contractsent', label: 'Contract Sent' },
   { id: 'closedwon', label: 'Closed Won' },
+  { id: 'closedlost', label: 'Closed Lost' },
   { id: '1352329432', label: 'No Response - After Meeting' },
   { id: 'qualifiedtobuy', label: 'Qualified To Buy' },
   { id: '5536133318', label: 'Back Burner' },

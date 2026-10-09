@@ -767,8 +767,21 @@ export async function updateDealSource(dealId: string, subSourceOrTag: string): 
   }
 }
 
-export async function updateDealStage(dealId: string, stage: string): Promise<any> {
+export async function updateDealStage(
+  dealId: string,
+  stage: string,
+  closedLostReason?: string,
+  closedLostNotes?: string
+): Promise<any> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const properties: Record<string, any> = {
+    dealstage: stage,
+  };
+
+  if (stage === 'closedlost' && closedLostReason) {
+    properties['closed_lost_reason'] = closedLostReason;
+  }
 
   const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
     method: 'PATCH',
@@ -776,19 +789,45 @@ export async function updateDealStage(dealId: string, stage: string): Promise<an
       Authorization: `Bearer ${TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      properties: {
-        dealstage: stage,
-      },
-    }),
+    body: JSON.stringify({ properties }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to update deal stage in HubSpot: ${errorText}`);
+    // If closed_lost_reason property fails (e.g. not configured on this portal), retry updating dealstage directly
+    if (properties['closed_lost_reason']) {
+      const retryRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ properties: { dealstage: stage } }),
+      });
+      if (!retryRes.ok) {
+        const errorText = await retryRes.text();
+        throw new Error(`Failed to update deal stage in HubSpot: ${errorText}`);
+      }
+    } else {
+      const errorText = await response.text();
+      throw new Error(`Failed to update deal stage in HubSpot: ${errorText}`);
+    }
   }
 
-  return response.json();
+  // If marked closed lost, also log a note documenting the reason
+  if (stage === 'closedlost' && closedLostReason) {
+    try {
+      await addDealNote(
+        dealId,
+        `<h3>❌ Deal Marked Closed Lost</h3><p><strong>Reason:</strong> ${closedLostReason}</p>${
+          closedLostNotes ? `<p><strong>Notes:</strong> ${closedLostNotes}</p>` : ''
+        }`
+      );
+    } catch (e) {
+      console.warn('Failed to log closed lost note:', e);
+    }
+  }
+
+  return { success: true };
 }
 
 export async function createDealMeeting(
