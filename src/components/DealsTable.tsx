@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Deal } from '@/lib/types';
+import { DealTagBadge } from './DealTagBadge';
 import { 
   Search, 
   ExternalLink, 
@@ -18,17 +19,21 @@ import {
 interface DealsTableProps {
   deals: Deal[];
   activeFilter: string;
+  selectedTagFilter?: string;
   onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
+  onTagUpdated?: () => void;
 }
 
 export function DealsTable({
   deals,
   activeFilter,
+  selectedTagFilter = 'ALL',
   onSelectDeal,
   onSelectDealForAnalysis,
   onDraftFollowUp,
+  onTagUpdated,
 }: DealsTableProps) {
   const [search, setSearch] = useState('');
   const [selectedStage, setSelectedStage] = useState('ALL');
@@ -48,7 +53,20 @@ export function DealsTable({
         // Status filter from KPI cards
         if (activeFilter === 'urgent' && d.health !== 'urgent') return false;
         if (activeFilter === 'warning' && d.health !== 'warning') return false;
+        if (activeFilter === 'snoozed' && d.health !== 'snoozed') return false;
         if (activeFilter === 'healthy' && d.health !== 'healthy') return false;
+
+        // Tag filter
+        if (selectedTagFilter && selectedTagFilter !== 'ALL') {
+          const isLibbyFilter = selectedTagFilter === 'Libby';
+          if (isLibbyFilter) {
+            const hasLibby = d.tags?.some((t) => /libby|liberty/i.test(t)) || /libby|liberty/i.test(d.subSource || '');
+            if (!hasLibby) return false;
+          } else {
+            const hasTag = d.tags?.includes(selectedTagFilter) || d.source === selectedTagFilter || d.subSource === selectedTagFilter;
+            if (!hasTag) return false;
+          }
+        }
 
         // Stage dropdown
         if (selectedStage !== 'ALL' && d.stageLabel !== selectedStage) return false;
@@ -122,6 +140,7 @@ export function DealsTable({
             <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 bg-slate-950/40">
               <th className="py-3.5 px-4 font-semibold">Deal Name</th>
               <th className="py-3.5 px-4 font-semibold">Stage</th>
+              <th className="py-3.5 px-4 font-semibold">Origin / Tags</th>
               <th className="py-3.5 px-4 font-semibold">Value</th>
               <th className="py-3.5 px-4 font-semibold">Last Touch</th>
               <th className="py-3.5 px-4 font-semibold">Health Status</th>
@@ -131,7 +150,7 @@ export function DealsTable({
           <tbody className="divide-y divide-slate-800/60 text-sm">
             {filteredDeals.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-slate-500 text-sm">
+                <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
                   No deals match your search criteria.
                 </td>
               </tr>
@@ -165,6 +184,16 @@ export function DealsTable({
                       <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
                         {deal.stageLabel}
                       </span>
+                    </td>
+
+                    {/* Origin / Tags */}
+                    <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                      <DealTagBadge
+                        dealId={deal.id}
+                        tags={deal.tags}
+                        subSource={deal.subSource}
+                        onTagUpdated={onTagUpdated}
+                      />
                     </td>
 
                     {/* Amount */}

@@ -1,4 +1,5 @@
 import { Deal, DealContact, DealNote, DealTask, DealEmail, PipelineStage } from './types';
+import { getCustomTagsMap, saveCustomTag } from './tags';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -85,6 +86,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       'hs_latest_meeting_activity',
       'hs_sales_email_last_replied',
       'hubspot_owner_id',
+      'source',
+      'sub_source',
     ],
     limit: 100,
     sorts: [
@@ -172,8 +175,22 @@ export async function getOpenDeals(): Promise<Deal[]> {
     console.warn('Failed to batch fetch tasks for deals:', err);
   }
 
+  const customTagsMap = getCustomTagsMap();
+
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
+
+    const customTags = customTagsMap[item.id] || [];
+    const rawSubSource = props.sub_source || null;
+    const rawSource = props.source || null;
+    const isLibby = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.includes('Libby');
+
+    const tagsSet = new Set<string>();
+    if (isLibby) tagsSet.add('Libby');
+    if (rawSubSource && rawSubSource !== 'Liberty Jai') tagsSet.add(rawSubSource);
+    if (rawSource) tagsSet.add(rawSource);
+    customTags.forEach((t) => tagsSet.add(t));
+    const tags = Array.from(tagsSet);
 
     // Collect all touchpoint and note timestamps
     const timestamps = [
@@ -282,6 +299,9 @@ export async function getOpenDeals(): Promise<Deal[]> {
       hubspotUrl: `https://app-eu1.hubspot.com/contacts/145683546/record/0-3/${item.id}`,
       nextTaskDate,
       nextTaskSubject,
+      source: rawSource,
+      subSource: rawSubSource,
+      tags,
     };
   });
 }
@@ -553,3 +573,33 @@ export async function updateDealTask(
 
   return response.json();
 }
+
+export async function updateDealSource(dealId: string, subSourceOrTag: string): Promise<boolean> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  // Map Libby to Liberty Jai for HubSpot's enumeration
+  const hsSubSource = subSourceOrTag === 'Libby' ? 'Liberty Jai' : subSourceOrTag;
+
+  // Save to local tags map so it immediately works for any tag
+  saveCustomTag(dealId, subSourceOrTag);
+
+  try {
+    const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        properties: {
+          sub_source: hsSubSource,
+        },
+      }),
+    });
+    return response.ok;
+  } catch (err) {
+    console.error('Failed to update deal sub_source in HubSpot:', err);
+    return true; // Still persisted locally
+  }
+}
+

@@ -50,6 +50,9 @@ export interface Deal {
   nextTaskDate?: string | null;
   nextTaskSubject?: string | null;
   associatedContacts?: DealContact[];
+  source?: string | null;
+  subSource?: string | null;
+  tags?: string[];
 }
 
 export interface PipelineStage {

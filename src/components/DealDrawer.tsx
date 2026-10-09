@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Deal, DealContact, DealNote, DealTask, DealEmail } from '@/lib/types';
+import { DealTagBadge } from './DealTagBadge';
 import { 
   X, 
   ExternalLink, 
@@ -206,6 +207,12 @@ export function DealDrawer({
                 <span className="text-sm font-mono font-bold text-emerald-400">
                   {formattedAmount}
                 </span>
+                <DealTagBadge
+                  dealId={deal.id}
+                  tags={deal.tags}
+                  subSource={deal.subSource}
+                  onTagUpdated={() => onRefreshDeals && onRefreshDeals()}
+                />
               </div>
               <h2 className="text-xl font-bold text-white mt-1.5 leading-snug">
                 {deal.name}
