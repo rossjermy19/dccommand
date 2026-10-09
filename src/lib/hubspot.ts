@@ -1,6 +1,7 @@
 import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
+import { getLibertyJStatusMap } from './liberty-j';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -246,6 +247,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
   const customTagsMap = getCustomTagsMap();
   const alignedStoriesMap = getAlignedStoriesMap();
+  const libertyJMap = getLibertyJStatusMap();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
@@ -254,18 +256,27 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const alignedStoryRecord = alignedStoriesMap[item.id];
     const rawSubSource = props.sub_source || null;
     const rawSource = props.source || null;
-    const isLibertyJ = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.some(t => /libby|liberty/i.test(t));
+    const isLibertyJSource = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.some(t => /libby|liberty/i.test(t));
+
+    // Liberty J Status Tracking
+    const libertyJRecord = libertyJMap[item.id];
+    const isBackWithLibertyJ = !!(libertyJRecord?.isBackWithLibertyJ || customTags.includes('Back with Liberty J'));
+    const backWithLibertyJDate = libertyJRecord?.date || null;
+    const daysWithLibertyJ = (isBackWithLibertyJ && backWithLibertyJDate)
+      ? Math.max(0, Math.floor((now - new Date(backWithLibertyJDate).getTime()) / (1000 * 60 * 60 * 24)))
+      : null;
 
     const createTime = props.createdate ? new Date(props.createdate).getTime() : 0;
     const daysOld = createTime > 0 ? (now - createTime) / (1000 * 60 * 60 * 24) : 999;
     const isNewDeal = daysOld <= 14;
 
     const tagsSet = new Set<string>();
-    if (isLibertyJ) tagsSet.add('Liberty J');
+    if (isLibertyJSource) tagsSet.add('Liberty J');
+    if (isBackWithLibertyJ) tagsSet.add('Back with Liberty J');
     if (rawSubSource && rawSubSource !== 'Liberty Jai') tagsSet.add(rawSubSource);
     if (rawSource) tagsSet.add(rawSource);
     customTags.forEach((t) => {
-      if (!/libby|liberty/i.test(t)) tagsSet.add(t);
+      if (!/libby|liberty/i.test(t) && t !== 'Back with Liberty J') tagsSet.add(t);
     });
     const tags = Array.from(tagsSet);
 
@@ -334,7 +345,13 @@ export async function getOpenDeals(): Promise<Deal[]> {
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
-    if (futureMeeting || isMeetingBookedStage) {
+    if (isBackWithLibertyJ) {
+      // 0. Handed to Liberty J -> Partner action to chase. Do not hassle Ross on his daily active desk!
+      health = 'snoozed';
+      healthReason = daysWithLibertyJ !== null
+        ? `With Liberty J (${daysWithLibertyJ}d) — action with partner to chase`
+        : 'With Liberty J — action with partner to chase';
+    } else if (futureMeeting || isMeetingBookedStage) {
       // 1. Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
       health = 'snoozed';
       if (futureMeeting) {
@@ -405,6 +422,10 @@ export async function getOpenDeals(): Promise<Deal[]> {
       isNewDeal,
       alignedStory: alignedStoryRecord?.story || null,
       alignedStoryReady: !!alignedStoryRecord,
+      isLibertyJ: isLibertyJSource || isBackWithLibertyJ,
+      isBackWithLibertyJ,
+      backWithLibertyJDate,
+      daysWithLibertyJ,
     };
   });
 }

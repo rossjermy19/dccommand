@@ -78,6 +78,10 @@ export interface Deal {
   isNewDeal?: boolean;
   alignedStory?: string | null;
   alignedStoryReady?: boolean;
+  isLibertyJ?: boolean;
+  isBackWithLibertyJ?: boolean;
+  backWithLibertyJDate?: string | null;
+  daysWithLibertyJ?: number | null;
 }
 
 export interface PipelineStage {
