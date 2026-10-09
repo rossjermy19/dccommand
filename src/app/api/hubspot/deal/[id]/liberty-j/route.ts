@@ -10,17 +10,17 @@ export async function POST(
 
     if (action === 'push') {
       const result = await pushDealToLibertyJ(params.id, dealName, notes);
-      return NextResponse.json({ success: true, ...result });
+      return NextResponse.json(result);
     }
 
     if (action === 'recall') {
       const result = await recallDealFromLibertyJ(params.id);
-      return NextResponse.json({ success: true, ...result });
+      return NextResponse.json(result);
     }
 
     if (action === 'kick') {
       const result = await kickLibertyJ(params.id, notes);
-      return NextResponse.json({ success: true, ...result });
+      return NextResponse.json(result);
     }
 
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });

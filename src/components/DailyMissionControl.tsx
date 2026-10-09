@@ -18,10 +18,13 @@ import {
   Kanban,
   Zap,
   Filter,
-  Archive
+  Archive,
+  RotateCcw,
+  Copy
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
 import { ClosedLostModal } from './ClosedLostModal';
+import { LibertyJModal } from './LibertyJModal';
 
 interface DailyMissionControlProps {
   deals: Deal[];
@@ -53,13 +56,21 @@ export function DailyMissionControl({
 }: DailyMissionControlProps) {
   const [clearedMissionIds, setClearedMissionIds] = useState<Set<string>>(() => new Set());
   const [animatingId, setAnimatingId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'action_due' | 'stalled' | 'new_deal' | 'aligned_story'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'action_due' | 'stalled' | 'new_deal' | 'aligned_story' | 'liberty_j'>('all');
 
   // Quick Plan date state for in-card scheduling
   const [schedulingDealId, setSchedulingDealId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string>('');
   const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
   const [closedLostDeal, setClosedLostDeal] = useState<Deal | null>(null);
+  const [libertyJModalDeal, setLibertyJModalDeal] = useState<Deal | null>(null);
+  const [libertyJModalMode, setLibertyJModalMode] = useState<'push' | 'kick' | 'recall'>('push');
+  const [copiedLibertyJList, setCopiedLibertyJList] = useState(false);
+
+  // Liberty J Partner Deals computation
+  const libertyJDeals = useMemo(() => deals.filter((d) => d.isBackWithLibertyJ), [deals]);
+  const libertyJTotalValue = useMemo(() => libertyJDeals.reduce((sum, d) => sum + (d.amount || 0), 0), [libertyJDeals]);
+  const libertyJNeedsKickCount = useMemo(() => libertyJDeals.filter((d) => (d.daysWithLibertyJ || 0) >= 7).length, [libertyJDeals]);
 
   // Generate dynamic missions from deals
   const rawMissions = useMemo<MissionItem[]>(() => {
@@ -286,10 +297,180 @@ export function DailyMissionControl({
             <span>Aligned Stories ({alignedCount})</span>
           </button>
         )}
+
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'liberty_j' ? 'all' : 'liberty_j')}
+          className={`px-3 py-1.5 rounded-lg font-bold transition shrink-0 flex items-center gap-1.5 ${
+            statusFilter === 'liberty_j'
+              ? 'bg-teal-700 text-white shadow-2xs'
+              : 'bg-teal-50 border border-teal-200 text-teal-900 hover:bg-teal-100'
+          }`}
+        >
+          <div className="h-3.5 w-6 bg-white rounded p-0.5 flex items-center justify-center shrink-0 border border-teal-200 shadow-2xs">
+            <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+          </div>
+          <span>Liberty J Queue ({libertyJDeals.length})</span>
+          {libertyJNeedsKickCount > 0 && (
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title={`${libertyJNeedsKickCount} deals waiting 7+ days need a kick`}></span>
+          )}
+        </button>
       </div>
 
-      {/* Zero State: Celebratory Victory Screen */}
-      {unclearedAllMissions.length === 0 ? (
+      {/* Liberty J Dedicated Queue View */}
+      {statusFilter === 'liberty_j' ? (
+        <div className="space-y-4">
+          {/* Liberty J Command Banner */}
+          <div className="bg-gradient-to-r from-teal-50 via-emerald-50 to-slate-50 border border-teal-200 rounded-2xl p-5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="h-12 w-20 bg-white border border-teal-200 rounded-xl p-1.5 flex items-center justify-center shadow-2xs overflow-hidden shrink-0">
+                  <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 leading-tight">
+                    Liberty J Partner Queue
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-0.5 max-w-lg">
+                    Deals currently handed back to Liberty J for them to reach out and chase. These deals are kept off your active daily desk until re-engaged.
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Copy Catch-up List */}
+              <button
+                onClick={() => {
+                  const text = [
+                    `Liberty J Follow-up Chase List (${new Date().toLocaleDateString('en-GB')}):`,
+                    ...libertyJDeals.map((d, i) => `${i + 1}. ${d.name} (${d.amount ? '£' + d.amount.toLocaleString() : 'No amount'}) - With Liberty J for ${d.daysWithLibertyJ || 0}d${(d.daysWithLibertyJ || 0) >= 7 ? ' [Needs Kick]' : ''}`)
+                  ].join('\n');
+                  navigator.clipboard.writeText(text);
+                  setCopiedLibertyJList(true);
+                  setTimeout(() => setCopiedLibertyJList(false), 2500);
+                }}
+                className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-teal-200 text-teal-900 rounded-xl text-xs font-bold shadow-2xs transition shrink-0"
+              >
+                {copiedLibertyJList ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-teal-700" />}
+                <span>{copiedLibertyJList ? 'Copied Chase List!' : 'Copy Liberty J Catch-up List'}</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-teal-200/70">
+              <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
+                <p className="text-[10.5px] uppercase font-bold text-slate-500">Deals with Partner</p>
+                <p className="text-lg font-black text-slate-900 mt-0.5">{libertyJDeals.length}</p>
+              </div>
+              <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
+                <p className="text-[10.5px] uppercase font-bold text-slate-500">Pipeline Value</p>
+                <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                  {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(libertyJTotalValue)}
+                </p>
+              </div>
+              <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
+                <p className="text-[10.5px] uppercase font-bold text-slate-500">Waiting &gt; 7 Days</p>
+                <p className="text-lg font-black text-amber-600 mt-0.5 flex items-center gap-1">
+                  <span>{libertyJNeedsKickCount}</span>
+                  {libertyJNeedsKickCount > 0 && <span className="text-[11px] font-bold text-amber-700">Needs Kick</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards for Deals with Liberty J */}
+          {libertyJDeals.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 text-xs text-slate-500">
+              No deals currently sitting with Liberty J. You can push any deal back to Liberty J using the &quot;To Liberty J&quot; button.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {libertyJDeals.map((deal) => {
+                const days = deal.daysWithLibertyJ || 0;
+                const needsKick = days >= 7;
+
+                return (
+                  <div
+                    key={deal.id}
+                    className={`bg-white rounded-xl border p-4 shadow-2xs space-y-3 transition ${
+                      needsKick ? 'border-amber-300 ring-1 ring-amber-200/50' : 'border-teal-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            needsKick ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-teal-100 text-teal-900'
+                          }`}>
+                            {days}d with Liberty J
+                          </span>
+                          {needsKick && (
+                            <span className="text-[10px] font-extrabold text-amber-700 flex items-center gap-0.5">
+                              <Zap className="h-3 w-3" />
+                              <span>Give them a kick!</span>
+                            </span>
+                          )}
+                        </div>
+                        <h4
+                          onClick={() => onSelectDeal(deal)}
+                          className="text-base font-bold text-slate-900 hover:text-blue-600 transition cursor-pointer"
+                        >
+                          {deal.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Stage: <span className="font-semibold text-slate-700">{deal.stageLabel}</span> • Amount: <span className="font-mono font-bold text-emerald-700">{deal.amount ? `£${deal.amount.toLocaleString()}` : '£—'}</span>
+                        </p>
+                      </div>
+
+                      <a
+                        href={deal.hubspotUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition"
+                        title="Open in HubSpot"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            setLibertyJModalDeal(deal);
+                            setLibertyJModalMode('kick');
+                          }}
+                          className="flex items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs"
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                          <span>Give Kick</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setLibertyJModalDeal(deal);
+                            setLibertyJModalMode('recall');
+                          }}
+                          className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 transition"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          <span>Recall to Desk</span>
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => onSelectDeal(deal)}
+                        className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition"
+                        title="View Timeline & Details"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : unclearedAllMissions.length === 0 ? (
         <div className="bg-white border border-emerald-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
           <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center border border-emerald-200">
             <Trophy className="h-7 w-7 text-amber-500" />
@@ -502,6 +683,21 @@ export function DailyMissionControl({
                       <span>Meeting Booked</span>
                     </button>
 
+                    {/* Resolution Action: Push to Liberty J */}
+                    <button
+                      onClick={() => {
+                        setLibertyJModalDeal(mission.deal);
+                        setLibertyJModalMode('push');
+                      }}
+                      className="flex items-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-teal-200 transition"
+                      title="Push deal back to Liberty J for them to chase up"
+                    >
+                      <div className="h-3 w-5 bg-white rounded p-0.5 flex items-center justify-center shrink-0 border border-teal-200 shadow-2xs">
+                        <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+                      </div>
+                      <span>To Liberty J</span>
+                    </button>
+
                     {/* Resolution Action 5: Quick Mark Lost */}
                     <button
                       onClick={() => setClosedLostDeal(mission.deal)}
@@ -549,6 +745,22 @@ export function DailyMissionControl({
             clearMission(`aligned_${closedLostDeal.id}`);
           }
           setClosedLostDeal(null);
+          onRefreshDeals();
+        }}
+      />
+
+      <LibertyJModal
+        isOpen={!!libertyJModalDeal}
+        deal={libertyJModalDeal}
+        mode={libertyJModalMode}
+        onClose={() => setLibertyJModalDeal(null)}
+        onSuccess={() => {
+          if (libertyJModalDeal) {
+            clearMission(`stalled_${libertyJModalDeal.id}`);
+            clearMission(`action_${libertyJModalDeal.id}`);
+            clearMission(`new_${libertyJModalDeal.id}`);
+          }
+          setLibertyJModalDeal(null);
           onRefreshDeals();
         }}
       />
