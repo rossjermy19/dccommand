@@ -187,17 +187,19 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const alignedStoryRecord = alignedStoriesMap[item.id];
     const rawSubSource = props.sub_source || null;
     const rawSource = props.source || null;
-    const isLibby = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.includes('Libby');
+    const isLibertyJ = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.some(t => /libby|liberty/i.test(t));
 
     const createTime = props.createdate ? new Date(props.createdate).getTime() : 0;
     const daysOld = createTime > 0 ? (now - createTime) / (1000 * 60 * 60 * 24) : 999;
     const isNewDeal = daysOld <= 14;
 
     const tagsSet = new Set<string>();
-    if (isLibby) tagsSet.add('Libby');
+    if (isLibertyJ) tagsSet.add('Liberty J');
     if (rawSubSource && rawSubSource !== 'Liberty Jai') tagsSet.add(rawSubSource);
     if (rawSource) tagsSet.add(rawSource);
-    customTags.forEach((t) => tagsSet.add(t));
+    customTags.forEach((t) => {
+      if (!/libby|liberty/i.test(t)) tagsSet.add(t);
+    });
     const tags = Array.from(tagsSet);
 
     // Collect all touchpoint and note timestamps
@@ -589,8 +591,8 @@ export async function updateDealTask(
 export async function updateDealSource(dealId: string, subSourceOrTag: string): Promise<boolean> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
-  // Map Libby to Liberty Jai for HubSpot's enumeration
-  const hsSubSource = subSourceOrTag === 'Libby' ? 'Liberty Jai' : subSourceOrTag;
+  // Map Liberty J to Liberty Jai for HubSpot's enumeration
+  const hsSubSource = (subSourceOrTag === 'Liberty J' || subSourceOrTag === 'Libby') ? 'Liberty Jai' : subSourceOrTag;
 
   // Save to local tags map so it immediately works for any tag
   saveCustomTag(dealId, subSourceOrTag);

@@ -6,14 +6,12 @@ import { DealTagBadge } from './DealTagBadge';
 import { 
   Search, 
   ExternalLink, 
-  Filter, 
   Sparkles, 
   Mail, 
-  ArrowUpDown,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  Calendar
+  CheckCircle, 
+  AlertCircle, 
+  Clock, 
+  Calendar 
 } from 'lucide-react';
 
 interface DealsTableProps {
@@ -58,14 +56,8 @@ export function DealsTable({
 
         // Tag filter
         if (selectedTagFilter && selectedTagFilter !== 'ALL') {
-          const isLibbyFilter = selectedTagFilter === 'Libby';
-          if (isLibbyFilter) {
-            const hasLibby = d.tags?.some((t) => /libby|liberty/i.test(t)) || /libby|liberty/i.test(d.subSource || '');
-            if (!hasLibby) return false;
-          } else {
-            const hasTag = d.tags?.includes(selectedTagFilter) || d.source === selectedTagFilter || d.subSource === selectedTagFilter;
-            if (!hasTag) return false;
-          }
+          const hasTag = d.tags?.includes(selectedTagFilter) || d.source === selectedTagFilter || d.subSource === selectedTagFilter;
+          if (!hasTag) return false;
         }
 
         // Stage dropdown
@@ -86,12 +78,12 @@ export function DealsTable({
         if (sortBy === 'contact') return (b.daysSinceContact || 999) - (a.daysSinceContact || 999);
         return new Date(b.lastModifiedDate).getTime() - new Date(a.lastModifiedDate).getTime();
       });
-  }, [deals, activeFilter, selectedStage, search, sortBy]);
+  }, [deals, activeFilter, selectedTagFilter, selectedStage, search, sortBy]);
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-      {/* Table Toolbar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+      {/* Table Toolbar (Light Theme) */}
+      <div className="p-4 sm:p-4.5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -100,7 +92,7 @@ export function DealsTable({
             placeholder="Search deals by name or pipeline stage..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
           />
         </div>
 
@@ -110,7 +102,7 @@ export function DealsTable({
           <select
             value={selectedStage}
             onChange={(e) => setSelectedStage(e.target.value)}
-            className="bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
           >
             <option value="ALL">All Stages ({deals.length})</option>
             {stages.map((st) => (
@@ -124,7 +116,7 @@ export function DealsTable({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
           >
             <option value="recent">Sort: Most Recently Active</option>
             <option value="amount">Sort: Highest Deal Value</option>
@@ -133,24 +125,24 @@ export function DealsTable({
         </div>
       </div>
 
-      {/* Table Content */}
+      {/* Table Content (Light Theme) */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 bg-slate-950/40">
-              <th className="py-3.5 px-4 font-semibold">Deal Name</th>
-              <th className="py-3.5 px-4 font-semibold">Stage</th>
-              <th className="py-3.5 px-4 font-semibold">Origin / Tags</th>
-              <th className="py-3.5 px-4 font-semibold">Value</th>
-              <th className="py-3.5 px-4 font-semibold">Last Touch</th>
-              <th className="py-3.5 px-4 font-semibold">Health Status</th>
-              <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
+            <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 bg-slate-50 font-bold">
+              <th className="py-3 px-4">Deal Name</th>
+              <th className="py-3 px-4">Stage</th>
+              <th className="py-3 px-4">Origin / Source</th>
+              <th className="py-3 px-4">Value</th>
+              <th className="py-3 px-4">Last Touch</th>
+              <th className="py-3 px-4">Health Status</th>
+              <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 text-sm">
+          <tbody className="divide-y divide-slate-100 text-sm bg-white">
             {filteredDeals.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
+                <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
                   No deals match your search criteria.
                 </td>
               </tr>
@@ -168,20 +160,20 @@ export function DealsTable({
                   <tr
                     key={deal.id}
                     onClick={() => onSelectDeal(deal)}
-                    className="hover:bg-slate-800/40 transition group cursor-pointer"
+                    className="hover:bg-slate-50/80 transition group cursor-pointer"
                   >
                     {/* Deal Name */}
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-white group-hover:text-blue-400 transition flex items-center space-x-1.5">
+                      <div className="font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center space-x-1.5">
                         <span>{deal.name}</span>
                         <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-70 transition text-slate-400" />
                       </div>
-                      <div className="text-[11px] text-slate-500">ID: {deal.id}</div>
+                      <div className="text-[11px] text-slate-400">ID: {deal.id}</div>
                     </td>
 
                     {/* Stage */}
                     <td className="py-3.5 px-4">
-                      <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                         {deal.stageLabel}
                       </span>
                     </td>
@@ -197,12 +189,12 @@ export function DealsTable({
                     </td>
 
                     {/* Amount */}
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-200">
+                    <td className="py-3.5 px-4 font-mono font-bold text-emerald-800">
                       {formattedAmount}
                     </td>
 
                     {/* Last Touch */}
-                    <td className="py-3.5 px-4 text-xs text-slate-400">
+                    <td className="py-3.5 px-4 text-xs text-slate-600 font-medium">
                       {deal.daysSinceContact !== null ? (
                         <span>
                           {deal.daysSinceContact === 0
@@ -212,34 +204,34 @@ export function DealsTable({
                             : `${deal.daysSinceContact}d ago`}
                         </span>
                       ) : (
-                        <span className="text-slate-500">None logged</span>
+                        <span className="text-slate-400">None logged</span>
                       )}
                     </td>
 
                     {/* Health Status */}
                     <td className="py-3.5 px-4">
                       {deal.health === 'urgent' && (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30">
-                          <AlertCircle className="h-3 w-3" />
-                          <span>Ghosting Risk</span>
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertCircle className="h-3 w-3 text-rose-600" />
+                          <span>Stalled &gt; 7d</span>
                         </span>
                       )}
                       {deal.health === 'warning' && (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                          <Clock className="h-3 w-3" />
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <Clock className="h-3 w-3 text-amber-600" />
                           <span>Action Due</span>
                         </span>
                       )}
                       {deal.health === 'snoozed' && (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
-                          <Calendar className="h-3 w-3" />
-                          <span>Planned Follow-up</span>
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <Calendar className="h-3 w-3 text-indigo-600" />
+                          <span>Planned</span>
                         </span>
                       )}
                       {deal.health === 'healthy' && (
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>Active</span>
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          <CheckCircle className="h-3 w-3 text-emerald-600" />
+                          <span>In Rhythm</span>
                         </span>
                       )}
                     </td>
@@ -248,16 +240,22 @@ export function DealsTable({
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
                         <button
-                          onClick={() => onSelectDealForAnalysis(deal)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectDealForAnalysis(deal);
+                          }}
                           title="Analyze Call / Meeting"
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 transition"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
                         >
-                          <Sparkles className="h-3.5 w-3.5" />
+                          <Sparkles className="h-3.5 w-3.5 text-amber-600" />
                         </button>
                         <button
-                          onClick={() => onDraftFollowUp(deal)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDraftFollowUp(deal);
+                          }}
                           title="Draft Follow-up Email"
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 transition"
                         >
                           <Mail className="h-3.5 w-3.5" />
                         </button>
@@ -265,8 +263,9 @@ export function DealsTable({
                           href={deal.hubspotUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title="Open in HubSpot"
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                          onClick={(e) => e.stopPropagation()}
+                          title="View in HubSpot CRM"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
@@ -278,11 +277,6 @@ export function DealsTable({
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="p-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
-        <span>Showing {filteredDeals.length} of {deals.length} active deals</span>
-        <span className="text-[11px] text-slate-500">Directly synchronized with HubSpot CRM</span>
       </div>
     </div>
   );

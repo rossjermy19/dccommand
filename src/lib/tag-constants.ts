@@ -6,12 +6,12 @@ export interface SourceOption {
 }
 
 export const SOURCE_OPTIONS: SourceOption[] = [
-  { label: 'Libby', value: 'Liberty Jai', badgeColor: 'bg-purple-900/40 text-purple-300 border-purple-500/40' },
-  { label: 'Partnerships - Evri', value: 'Partnerships - Evri', badgeColor: 'bg-cyan-900/40 text-cyan-300 border-cyan-500/40' },
-  { label: 'Customer Referral', value: 'Customer Refferal', badgeColor: 'bg-emerald-900/40 text-emerald-300 border-emerald-500/40' },
-  { label: 'SDR Outbound', value: 'SDR', badgeColor: 'bg-blue-900/40 text-blue-300 border-blue-500/40' },
-  { label: 'Direct', value: 'Direct', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
-  { label: 'Shopify', value: 'Orders Shopify', badgeColor: 'bg-amber-900/40 text-amber-300 border-amber-500/40' },
-  { label: 'Inbound', value: 'Inbound Call', badgeColor: 'bg-teal-900/40 text-teal-300 border-teal-500/40' },
-  { label: 'Event', value: 'Industry Events', badgeColor: 'bg-pink-900/40 text-pink-300 border-pink-500/40' },
+  { label: 'Liberty J', value: 'Liberty Jai', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { label: 'Partnerships - Evri', value: 'Partnerships - Evri', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { label: 'Customer Referral', value: 'Customer Refferal', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { label: 'SDR Outbound', value: 'SDR', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { label: 'Direct', value: 'Direct', badgeColor: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { label: 'Shopify', value: 'Orders Shopify', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { label: 'Inbound', value: 'Inbound Call', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { label: 'Event', value: 'Industry Events', badgeColor: 'bg-pink-50 text-pink-700 border-pink-200' },
 ];

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Deal } from '@/lib/types';
 import { 
   Trophy, 
@@ -17,7 +17,7 @@ import {
   ExternalLink,
   Kanban,
   Zap,
-  Tag
+  Filter
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
 
@@ -49,9 +49,9 @@ export function DailyMissionControl({
   onSwitchToPipelineBoard,
   onRefreshDeals,
 }: DailyMissionControlProps) {
-  // Track dismissed/completed mission IDs in local session storage so they vanish immediately
   const [clearedMissionIds, setClearedMissionIds] = useState<Set<string>>(() => new Set());
   const [animatingId, setAnimatingId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'action_due' | 'stalled' | 'new_deal' | 'aligned_story'>('all');
 
   // Quick Plan date state for in-card scheduling
   const [schedulingDealId, setSchedulingDealId] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function DailyMissionControl({
           deal,
           type: 'stalled',
           title: `No touchpoint in ${deal.daysSinceContact || 7} days`,
-          description: `Mr. Ross, ${deal.name} is stalled without an agreed next step. Send a nudge or schedule a follow-up date.`,
+          description: `No contact recently and no scheduled next step. Plan a follow-up date or send an email.`,
           urgency: 'high',
         });
       }
@@ -81,7 +81,7 @@ export function DailyMissionControl({
           id: `action_${deal.id}`,
           deal,
           type: 'action_due',
-          title: deal.nextTaskSubject ? `Task due: ${deal.nextTaskSubject}` : `Action due: Meeting held recently`,
+          title: deal.nextTaskSubject ? `Task due: ${deal.nextTaskSubject}` : `Action due: Follow-up required`,
           description: deal.healthReason || `Deliverable or proposal due for ${deal.name}.`,
           urgency: 'high',
         });
@@ -93,8 +93,8 @@ export function DailyMissionControl({
           id: `new_${deal.id}`,
           deal,
           type: 'new_deal',
-          title: `✨ Fresh Opportunity Landed`,
-          description: `New deal in ${deal.stageLabel}. Review pre-call notes and confirm intro appointment.`,
+          title: `Fresh Opportunity Landed`,
+          description: `New lead in ${deal.stageLabel}. Review pre-call notes and confirm intro appointment.`,
           urgency: 'medium',
         });
       }
@@ -109,7 +109,7 @@ export function DailyMissionControl({
           id: `aligned_${deal.id}`,
           deal,
           type: 'aligned_story',
-          title: `🎬 Meeting held — Aligned Room Story ready to generate`,
+          title: `Meeting held — Aligned Room Story ready`,
           description: `Turn the Fireflies recording for ${deal.name} into the customer-facing Aligned room story.`,
           urgency: 'medium',
         });
@@ -121,13 +121,27 @@ export function DailyMissionControl({
 
   // Filter out cleared missions
   const activeMissions = useMemo(() => {
+    return rawMissions
+      .filter((m) => !clearedMissionIds.has(m.id))
+      .filter((m) => {
+        if (statusFilter === 'all') return true;
+        return m.type === statusFilter;
+      });
+  }, [rawMissions, clearedMissionIds, statusFilter]);
+
+  const unclearedAllMissions = useMemo(() => {
     return rawMissions.filter((m) => !clearedMissionIds.has(m.id));
   }, [rawMissions, clearedMissionIds]);
 
-  const totalMissions = rawMissions.length;
+  const totalCount = unclearedAllMissions.length;
+  const stalledCount = unclearedAllMissions.filter((m) => m.type === 'stalled').length;
+  const actionDueCount = unclearedAllMissions.filter((m) => m.type === 'action_due').length;
+  const newDealCount = unclearedAllMissions.filter((m) => m.type === 'new_deal').length;
+  const alignedCount = unclearedAllMissions.filter((m) => m.type === 'aligned_story').length;
+
   const clearedCount = clearedMissionIds.size;
-  const completionPercentage = totalMissions > 0 
-    ? Math.min(100, Math.round((clearedCount / (clearedCount + activeMissions.length)) * 100))
+  const completionPercentage = (clearedCount + unclearedAllMissions.length) > 0 
+    ? Math.min(100, Math.round((clearedCount / (clearedCount + unclearedAllMissions.length)) * 100))
     : 100;
 
   // Clear an item with animation
@@ -136,7 +150,7 @@ export function DailyMissionControl({
     setTimeout(() => {
       setClearedMissionIds((prev) => new Set(prev).add(missionId));
       setAnimatingId(null);
-    }, 300);
+    }, 250);
   };
 
   // 1-Click quick schedule follow-up task directly in HubSpot
@@ -167,185 +181,254 @@ export function DailyMissionControl({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Gamified Header: Daily Mission Score */}
-      <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40 border border-blue-500/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="space-y-5">
+      {/* Gamified Header: Clean Light Mode Banner */}
+      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-100 rounded-2xl p-5 sm:p-6 shadow-2xs">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                <Zap className="h-3.5 w-3.5 text-amber-400" />
-                <span>Daily Sales Clear-Desk Mode</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100/80 text-blue-800 border border-blue-200">
+                <Zap className="h-3.5 w-3.5 text-blue-600" />
+                <span>Daily Clear-Desk Command</span>
               </span>
-              <span className="text-xs text-slate-400 font-medium">Ross Jermy</span>
+              <span className="text-xs text-slate-500 font-medium">Ross Jermy</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-              {activeMissions.length === 0
-                ? "🎉 Clean Desk Achieved, Mr. Ross!"
-                : `You have ${activeMissions.length} active deal actions today.`}
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              {unclearedAllMissions.length === 0
+                ? "Clean Desk Achieved!"
+                : `${unclearedAllMissions.length} active deal actions today.`}
             </h2>
-            <p className="text-xs text-slate-400 mt-1 max-w-xl">
-              {activeMissions.length === 0
-                ? "Every single deal has active communication or a confirmed next date. Your pipeline is in 100% momentum."
-                : "Act on these priority items to ensure zero dropped balls. Watch each card vanish as you take action."}
+            <p className="text-xs text-slate-600 mt-1 max-w-xl">
+              {unclearedAllMissions.length === 0
+                ? "Every deal has active communication or a planned next date. Your pipeline is in healthy momentum."
+                : "Act on these priority items so nothing slips. Each card disappears as you complete or schedule it."}
             </p>
           </div>
 
-          {/* Gamified Progress Bar Widget */}
-          <div className="w-full md:w-72 bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 shrink-0">
+          {/* Progress Bar Widget */}
+          <div className="w-full md:w-72 bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-2xs shrink-0">
             <div className="flex items-center justify-between text-xs font-bold mb-2">
-              <span className="text-slate-300 flex items-center gap-1">
-                <Trophy className="h-3.5 w-3.5 text-amber-400" />
-                <span>Daily Cleared</span>
+              <span className="text-slate-700 flex items-center gap-1">
+                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                <span>Daily Progress</span>
               </span>
-              <span className="font-mono text-emerald-400">{completionPercentage}%</span>
+              <span className="font-mono text-emerald-700">{completionPercentage}%</span>
             </div>
             
             {/* Progress bar track */}
-            <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500 rounded-full"
+                className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 rounded-full"
                 style={{ width: `${completionPercentage}%` }}
               ></div>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-medium">
               <span>{clearedCount} completed</span>
-              <span>{activeMissions.length} pending</span>
+              <span>{unclearedAllMissions.length} remaining</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Status Filters Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`px-3 py-1.5 rounded-lg font-bold transition shrink-0 ${
+            statusFilter === 'all'
+              ? 'bg-slate-900 text-white shadow-2xs'
+              : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          All Items ({totalCount})
+        </button>
+
+        {actionDueCount > 0 && (
+          <button
+            onClick={() => setStatusFilter('action_due')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 ${
+              statusFilter === 'action_due'
+                ? 'bg-amber-600 text-white shadow-2xs font-bold'
+                : 'bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            <Clock className="h-3 w-3" />
+            <span>Action Due ({actionDueCount})</span>
+          </button>
+        )}
+
+        {stalledCount > 0 && (
+          <button
+            onClick={() => setStatusFilter('stalled')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 ${
+              statusFilter === 'stalled'
+                ? 'bg-rose-600 text-white shadow-2xs font-bold'
+                : 'bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100'
+            }`}
+          >
+            <Flame className="h-3 w-3" />
+            <span>Stalled &gt; 7d ({stalledCount})</span>
+          </button>
+        )}
+
+        {newDealCount > 0 && (
+          <button
+            onClick={() => setStatusFilter('new_deal')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 ${
+              statusFilter === 'new_deal'
+                ? 'bg-sky-600 text-white shadow-2xs font-bold'
+                : 'bg-sky-50 border border-sky-200 text-sky-800 hover:bg-sky-100'
+            }`}
+          >
+            <Sparkles className="h-3 w-3" />
+            <span>New Deals ({newDealCount})</span>
+          </button>
+        )}
+
+        {alignedCount > 0 && (
+          <button
+            onClick={() => setStatusFilter('aligned_story')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 ${
+              statusFilter === 'aligned_story'
+                ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                : 'bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100'
+            }`}
+          >
+            <Sparkles className="h-3 w-3" />
+            <span>Aligned Stories ({alignedCount})</span>
+          </button>
+        )}
+      </div>
+
       {/* Zero State: Celebratory Victory Screen */}
-      {activeMissions.length === 0 ? (
-        <div className="bg-slate-900/60 border border-emerald-500/30 rounded-2xl p-12 text-center space-y-4 shadow-xl">
-          <div className="h-16 w-16 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-500/40">
-            <Trophy className="h-8 w-8 text-amber-400" />
+      {unclearedAllMissions.length === 0 ? (
+        <div className="bg-white border border-emerald-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
+          <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center border border-emerald-200">
+            <Trophy className="h-7 w-7 text-amber-500" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white">Zero Pending Actions!</h3>
-            <p className="text-sm text-slate-400 max-w-md mx-auto mt-1">
-              Outstanding work, Mr. Ross. You&apos;ve cleared your daily queue. All deals are moving forward with active touchpoints or planned dates.
+            <h3 className="text-xl font-black text-slate-900">Zero Pending Actions!</h3>
+            <p className="text-sm text-slate-600 max-w-md mx-auto mt-1">
+              Outstanding work, Ross. All deals are moving forward with active touchpoints or planned dates.
             </p>
           </div>
           <div className="pt-2">
             <button
               onClick={onSwitchToPipelineBoard}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-blue-600/30 transition"
+              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm shadow-blue-500/20 transition"
             >
               <Kanban className="h-4 w-4" />
               <span>Explore Full Pipeline Board</span>
             </button>
           </div>
         </div>
+      ) : activeMissions.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-500">
+          No items match the selected status filter.
+        </div>
       ) : (
-        /* Action Queue Cards Stream */
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">
-              Priority Action Items ({activeMissions.length})
-            </span>
-            <span className="text-[11px] text-slate-500">
-              Click action to resolve and clear from dashboard
-            </span>
-          </div>
+        /* Action Queue Cards: SIDE-BY-SIDE 2-COLUMN GRID */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {activeMissions.map((mission) => {
+            const isAnimating = animatingId === mission.id;
+            const formattedAmount = mission.deal.amount
+              ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(mission.deal.amount)
+              : '£—';
 
-          <div className="grid grid-cols-1 gap-3">
-            {activeMissions.map((mission) => {
-              const isAnimating = animatingId === mission.id;
-              const formattedAmount = mission.deal.amount
-                ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(mission.deal.amount)
-                : '£—';
-
-              return (
-                <div
-                  key={mission.id}
-                  className={`bg-slate-900/90 border rounded-2xl p-4 sm:p-5 shadow-lg transition-all duration-300 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                    isAnimating ? 'opacity-0 scale-95 -translate-y-4' : 'opacity-100 scale-100'
-                  } ${
-                    mission.type === 'stalled'
-                      ? 'border-rose-900/60 bg-gradient-to-r from-rose-950/20 via-slate-900 to-slate-900'
-                      : mission.type === 'action_due'
-                      ? 'border-amber-900/60 bg-gradient-to-r from-amber-950/20 via-slate-900 to-slate-900'
-                      : mission.type === 'new_deal'
-                      ? 'border-cyan-900/60 bg-gradient-to-r from-cyan-950/20 via-slate-900 to-slate-900'
-                      : 'border-purple-900/60 bg-gradient-to-r from-purple-950/20 via-slate-900 to-slate-900'
-                  }`}
-                >
-                  {/* Left Column: Deal Metadata & Issue */}
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Urgency Badge */}
+            return (
+              <div
+                key={mission.id}
+                className={`bg-white border rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-250 flex flex-col justify-between space-y-3 relative ${
+                  isAnimating ? 'opacity-0 scale-95 -translate-y-2' : 'opacity-100 scale-100'
+                } ${
+                  mission.type === 'stalled'
+                    ? 'border-rose-200 hover:border-rose-300'
+                    : mission.type === 'action_due'
+                    ? 'border-amber-200 hover:border-amber-300'
+                    : mission.type === 'new_deal'
+                    ? 'border-sky-200 hover:border-sky-300'
+                    : 'border-indigo-200 hover:border-indigo-300'
+                }`}
+              >
+                {/* Card Top Row: Urgency badge, Stage, Amount */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {mission.type === 'stalled' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-600">
-                          <Flame className="h-3 w-3 text-rose-400" />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <Flame className="h-3 w-3 text-rose-600" />
                           <span>STALLED RISK</span>
                         </span>
                       )}
                       {mission.type === 'action_due' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-600">
-                          <Clock className="h-3 w-3 text-amber-400" />
-                          <span>ACTION DUE TODAY</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <Clock className="h-3 w-3 text-amber-600" />
+                          <span>ACTION DUE</span>
                         </span>
                       )}
                       {mission.type === 'new_deal' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-600">
-                          <Sparkles className="h-3 w-3 text-cyan-400" />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                          <Sparkles className="h-3 w-3 text-sky-600" />
                           <span>NEW DEAL</span>
                         </span>
                       )}
                       {mission.type === 'aligned_story' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-600">
-                          <Sparkles className="h-3 w-3 text-purple-400" />
-                          <span>ALIGNED STORY READY</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <Sparkles className="h-3 w-3 text-indigo-600" />
+                          <span>ALIGNED STORY</span>
                         </span>
                       )}
 
-                      {/* Origin / Libby Tag */}
+                      {/* Source tag chip (Liberty J, etc.) */}
                       <DealTagBadge
                         dealId={mission.deal.id}
                         tags={mission.deal.tags}
                         subSource={mission.deal.subSource}
                         onTagUpdated={onRefreshDeals}
                       />
-
-                      <span className="text-xs font-mono font-bold text-emerald-400">
-                        {formattedAmount}
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">
-                        • {mission.deal.stageLabel}
-                      </span>
                     </div>
 
-                    {/* Deal Name */}
-                    <div className="flex items-center gap-2">
-                      <h4
-                        onClick={() => onSelectDeal(mission.deal)}
-                        className="text-base font-bold text-white hover:text-blue-400 transition cursor-pointer flex items-center gap-1.5"
-                      >
-                        <span>{mission.deal.name}</span>
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
-                      </h4>
-                      <a
-                        href={mission.deal.hubspotUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-500 hover:text-slate-300"
-                        title="Open in HubSpot"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </div>
-
-                    {/* Mission Instruction */}
-                    <p className="text-xs text-slate-300 font-medium">
-                      {mission.description}
-                    </p>
+                    <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                      {formattedAmount}
+                    </span>
                   </div>
 
-                  {/* Right Column: Resolution Actions */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* Deal Title */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4
+                        onClick={() => onSelectDeal(mission.deal)}
+                        className="text-base font-bold text-slate-900 hover:text-blue-600 transition cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{mission.deal.name}</span>
+                        <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        Stage: <span className="text-slate-700 font-semibold">{mission.deal.stageLabel}</span> • {mission.deal.daysSinceContact !== null ? `${mission.deal.daysSinceContact}d since last touch` : 'No touch yet'}
+                      </p>
+                    </div>
+
+                    <a
+                      href={mission.deal.hubspotUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition shrink-0"
+                      title="Open in HubSpot"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+
+                  {/* Context & Description */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5 text-xs text-slate-700">
+                    <p className="font-medium">{mission.description}</p>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Resolution Action Buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {/* Resolution Action 1: Post-Call Aligned Story */}
                     {mission.type === 'aligned_story' && (
                       <button
@@ -353,10 +436,10 @@ export function DailyMissionControl({
                           onOpenAlignedModal(mission.deal);
                           clearMission(mission.id);
                         }}
-                        className="flex items-center space-x-1.5 bg-purple-600 hover:bg-purple-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-purple-600/30 transition"
+                        className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-2xs transition"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
-                        <span>Generate Aligned Story</span>
+                        <span>Aligned Story</span>
                       </button>
                     )}
 
@@ -366,7 +449,7 @@ export function DailyMissionControl({
                         onDraftFollowUp(mission.deal);
                         clearMission(mission.id);
                       }}
-                      className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-md shadow-blue-600/25 transition"
+                      className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition"
                     >
                       <Mail className="h-3.5 w-3.5" />
                       <span>Draft Email</span>
@@ -374,23 +457,23 @@ export function DailyMissionControl({
 
                     {/* Resolution Action 3: Quick Plan / Schedule */}
                     {schedulingDealId === mission.deal.id ? (
-                      <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
                         <input
                           type="date"
                           value={scheduleDate}
                           onChange={(e) => setScheduleDate(e.target.value)}
-                          className="bg-slate-900 border border-slate-700 text-white text-xs px-2 py-1 rounded"
+                          className="bg-slate-50 border border-slate-200 text-slate-900 text-xs px-2 py-1 rounded"
                         />
                         <button
                           onClick={() => handleQuickSchedule(mission.deal, scheduleDate, `Follow-up with ${mission.deal.name}`)}
                           disabled={!scheduleDate || isSubmittingSchedule}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-xs font-bold"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-xs font-bold"
                         >
                           Save
                         </button>
                         <button
                           onClick={() => setSchedulingDealId(null)}
-                          className="text-slate-400 hover:text-white px-1.5 text-xs"
+                          className="text-slate-400 hover:text-slate-600 px-1 text-xs"
                         >
                           ✕
                         </button>
@@ -398,41 +481,40 @@ export function DailyMissionControl({
                     ) : (
                       <button
                         onClick={() => {
-                          // Default date: 7 days from now
                           const d = new Date();
                           d.setDate(d.getDate() + 7);
                           setScheduleDate(d.toISOString().split('T')[0]);
                           setSchedulingDealId(mission.deal.id);
                         }}
-                        className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-medium border border-slate-700 transition"
+                        className="flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 transition"
                       >
-                        <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                        <Calendar className="h-3.5 w-3.5 text-indigo-600" />
                         <span>Plan Follow-up</span>
                       </button>
                     )}
 
-                    {/* Open Full Notes Drawer */}
+                    {/* Timeline Drawer */}
                     <button
                       onClick={() => onSelectDeal(mission.deal)}
                       title="View Timeline & Details"
-                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition"
+                      className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition"
                     >
                       <FileText className="h-4 w-4" />
                     </button>
-
-                    {/* Quick Dismiss / Done */}
-                    <button
-                      onClick={() => clearMission(mission.id)}
-                      title="Mark Handled / Clear Card"
-                      className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
                   </div>
+
+                  {/* Quick Done checkmark */}
+                  <button
+                    onClick={() => clearMission(mission.id)}
+                    title="Mark Handled / Clear Card"
+                    className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

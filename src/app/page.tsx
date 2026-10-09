@@ -117,11 +117,25 @@ export default function DashboardPage() {
   };
 
   // Compute Libby deals count for quick filter button
-  const libbyDealsCount = useMemo(() => {
+  // Dynamic sources for the filter dropdown
+  const availableSources = useMemo(() => {
+    const set = new Set<string>();
+    deals.forEach((d) => {
+      if (d.tags) d.tags.forEach((t) => set.add(t));
+      if (d.subSource) {
+        set.add(d.subSource === 'Liberty Jai' ? 'Liberty J' : d.subSource);
+      }
+      if (d.dealSource) set.add(d.dealSource);
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [deals]);
+
+  // Compute Liberty J deals count for quick filter button
+  const libertyJDealsCount = useMemo(() => {
     return deals.filter(
       (d) =>
-        d.tags?.some((t) => /libby|liberty/i.test(t)) ||
-        /libby|liberty/i.test(d.subSource || '')
+        d.tags?.some((t) => /liberty|libby/i.test(t)) ||
+        /liberty|libby/i.test(d.subSource || '')
     ).length;
   }, [deals]);
 
@@ -131,7 +145,7 @@ export default function DashboardPage() {
   }, [deals]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B0F17]">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <Navbar
         onOpenTranscriptModal={() => handleOpenAnalysis()}
         onRefresh={handleRefresh}
@@ -141,14 +155,14 @@ export default function DashboardPage() {
       <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
         {/* Error Notification */}
         {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
             <div className="flex items-center space-x-2">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
             <button
               onClick={handleRefresh}
-              className="text-xs bg-rose-500/20 hover:bg-rose-500/30 px-3 py-1.5 rounded-lg font-medium transition"
+              className="text-xs bg-rose-100 hover:bg-rose-200 text-rose-800 px-3 py-1.5 rounded-lg font-medium transition"
             >
               Retry
             </button>
@@ -158,8 +172,8 @@ export default function DashboardPage() {
         {/* Loading Spinner */}
         {loading ? (
           <div className="py-24 text-center space-y-4">
-            <RefreshCw className="h-8 w-8 text-blue-500 animate-spin mx-auto" />
-            <h3 className="text-base font-semibold text-slate-200">
+            <RefreshCw className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
+            <h3 className="text-base font-semibold text-slate-800">
               Synchronizing with HubSpot CRM...
             </h3>
             <p className="text-xs text-slate-500">
@@ -182,18 +196,18 @@ export default function DashboardPage() {
             />
 
             {/* Navigation Bar & Mode Switcher */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-slate-200 pb-3">
               {/* Primary Views Tabs */}
               <div className="flex items-center space-x-2 flex-wrap">
                 <button
                   onClick={() => setViewMode('mission')}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
                     viewMode === 'mission'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 ring-1 ring-blue-400'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Target className="h-4 w-4 text-amber-400" />
+                  <Target className={`h-4 w-4 ${viewMode === 'mission' ? 'text-amber-300' : 'text-amber-500'}`} />
                   <span>Daily Clear-Desk Command</span>
                   {pendingMissionsCount > 0 && (
                     <span className="text-[10px] bg-rose-500 text-white font-extrabold px-1.5 py-0.2 rounded-full ml-1">
@@ -204,37 +218,39 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => setViewMode('stages')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
                     viewMode === 'stages'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <Kanban className="h-3.5 w-3.5" />
                   <span>Pipeline Board</span>
-                  <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded-full">
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
+                    viewMode === 'stages' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
                     {deals.length}
                   </span>
                 </button>
 
                 <button
                   onClick={() => setViewMode('radar')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
                     viewMode === 'radar'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Flame className="h-3.5 w-3.5 text-amber-400" />
+                  <Flame className={`h-3.5 w-3.5 ${viewMode === 'radar' ? 'text-amber-300' : 'text-amber-500'}`} />
                   <span>Action Radar</span>
                 </button>
 
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
                     viewMode === 'table'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <Table className="h-3.5 w-3.5" />
@@ -252,52 +268,52 @@ export default function DashboardPage() {
                     placeholder="Search deals, tags, stages..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-sm"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   )}
                 </div>
 
-                {/* 1-Click Tag Filter: Libby */}
+                {/* 1-Click Tag Filter: Liberty J */}
                 <button
                   onClick={() =>
-                    setSelectedTagFilter(selectedTagFilter === 'Libby' ? 'ALL' : 'Libby')
+                    setSelectedTagFilter(selectedTagFilter === 'Liberty J' ? 'ALL' : 'Liberty J')
                   }
-                  className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition border ${
-                    selectedTagFilter === 'Libby'
-                      ? 'bg-purple-900/80 text-purple-200 border-purple-500 shadow-sm ring-1 ring-purple-500'
-                      : 'bg-purple-950/40 text-purple-300 border-purple-500/40 hover:bg-purple-900/50'
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border shadow-sm ${
+                    selectedTagFilter === 'Liberty J'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
+                      : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
                   }`}
-                  title="Filter to only deals originating from Libby"
+                  title="Filter to deals originating from Liberty J"
                 >
                   <span className="text-amber-400">★</span>
-                  <span>Libby Deals</span>
-                  <span className="text-[10px] bg-purple-900 text-purple-200 px-1.5 py-0.2 rounded-full">
-                    {libbyDealsCount}
+                  <span>Liberty J</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    selectedTagFilter === 'Liberty J' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-700'
+                  }`}>
+                    {libertyJDealsCount}
                   </span>
                 </button>
 
-                {/* Tag Filter Dropdown */}
+                {/* Dynamic Tag Filter Dropdown */}
                 <div className="flex items-center gap-1.5">
                   <select
-                    value={selectedTagFilter === 'Libby' ? 'ALL' : selectedTagFilter}
+                    value={selectedTagFilter === 'Liberty J' ? 'ALL' : selectedTagFilter}
                     onChange={(e) => setSelectedTagFilter(e.target.value)}
-                    className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-sm"
                   >
-                    <option value="ALL">All Sources</option>
-                    <option value="Partnerships - Evri">Partnerships - Evri</option>
-                    <option value="Customer Refferal">Customer Referral</option>
-                    <option value="SDR">SDR Outbound</option>
-                    <option value="Direct">Direct</option>
-                    <option value="Orders Shopify">Shopify</option>
-                    <option value="Outbound">Outbound</option>
-                    <option value="Partnership">Partnership</option>
+                    <option value="ALL">All Sources & Tags</option>
+                    {availableSources.map((source) => (
+                      <option key={source} value={source}>
+                        {source}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -309,7 +325,7 @@ export default function DashboardPage() {
                       setSelectedTagFilter('ALL');
                       setSearchQuery('');
                     }}
-                    className="text-[11px] text-slate-400 hover:text-white px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded-md transition"
+                    className="text-[11px] text-slate-600 hover:text-slate-900 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg font-medium transition shadow-sm"
                   >
                     Reset All
                   </button>
