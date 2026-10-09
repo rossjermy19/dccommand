@@ -1,0 +1,16 @@
+# Environment variables
+.env
+.env*.local
+
+# Node modules / build
+node_modules/
+.next/
+dist/
+out/
+build/
+
+# Logs & OS
+*.log
+.DS_Store
+.vscode/
+.idea/
