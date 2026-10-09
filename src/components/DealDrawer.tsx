@@ -22,8 +22,10 @@ import {
   Sparkles,
   RefreshCw,
   Bell,
-  Archive
+  Archive,
+  Zap
 } from 'lucide-react';
+import { LibertyJModal } from './LibertyJModal';
 
 interface DealDrawerProps {
   deal: Deal | null;
@@ -118,6 +120,8 @@ export function DealDrawer({
   };
 
   const [isClosedLostModalOpen, setIsClosedLostModalOpen] = useState(false);
+  const [isLibertyJModalOpen, setIsLibertyJModalOpen] = useState(false);
+  const [libertyJMode, setLibertyJMode] = useState<'push' | 'kick' | 'recall'>('push');
 
   const handleStageChange = async (newStage: string) => {
     if (!deal || newStage === currentStage) return;
@@ -391,6 +395,38 @@ export function DealDrawer({
               <h2 className="text-xl font-black text-slate-900 mt-2.5 leading-snug">
                 {deal.name}
               </h2>
+
+              {deal.isBackWithLibertyJ && (
+                <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-7 w-12 bg-white border border-teal-200 rounded-lg p-0.5 flex items-center justify-center shrink-0 shadow-2xs">
+                      <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-teal-950 flex items-center gap-1.5">
+                        <span>Currently Handed to Liberty J</span>
+                        <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded">
+                          {deal.daysWithLibertyJ !== null && deal.daysWithLibertyJ !== undefined ? `${deal.daysWithLibertyJ}d with partner` : 'With partner'}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-teal-700 font-medium">
+                        Liberty J have the action to chase and re-engage this prospect for you.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setLibertyJMode('kick');
+                      setIsLibertyJModalOpen(true);
+                    }}
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs shrink-0"
+                    title="Log that you chased Liberty J on progress"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    <span>Give Kick</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-1.5 flex-shrink-0">
@@ -471,6 +507,36 @@ export function DealDrawer({
               >
                 <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
                 <span>Aligned Story</span>
+              </button>
+            )}
+
+            {deal.isBackWithLibertyJ ? (
+              <button
+                onClick={() => {
+                  setLibertyJMode('recall');
+                  setIsLibertyJModalOpen(true);
+                }}
+                className="flex items-center space-x-1.5 text-xs font-bold bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 px-3 py-1.5 rounded-lg transition"
+                title="Recall deal back to your active desk"
+              >
+                <div className="h-3.5 w-6 bg-white rounded p-0.5 flex items-center justify-center shrink-0 border border-teal-200">
+                  <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+                </div>
+                <span>Recall to My Desk</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setLibertyJMode('push');
+                  setIsLibertyJModalOpen(true);
+                }}
+                className="flex items-center space-x-1.5 text-xs font-bold bg-white hover:bg-teal-50 text-teal-800 border border-teal-200 px-3 py-1.5 rounded-lg transition"
+                title="Push deal back to Liberty J for them to chase up"
+              >
+                <div className="h-3.5 w-6 bg-white rounded p-0.5 flex items-center justify-center shrink-0 border border-teal-200">
+                  <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+                </div>
+                <span>Hand to Liberty J</span>
               </button>
             )}
 
@@ -1046,6 +1112,18 @@ export function DealDrawer({
         onSuccess={() => {
           onRefreshDeals?.();
           onClose();
+        }}
+      />
+
+      <LibertyJModal
+        isOpen={isLibertyJModalOpen}
+        deal={deal}
+        mode={libertyJMode}
+        onClose={() => setIsLibertyJModalOpen(false)}
+        onSuccess={() => {
+          setIsLibertyJModalOpen(false);
+          onRefreshDeals?.();
+          fetchDetails(deal.id);
         }}
       />
     </div>

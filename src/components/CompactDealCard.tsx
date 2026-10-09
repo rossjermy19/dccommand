@@ -40,6 +40,15 @@ export function CompactDealCard({
 
   // Health Pill styling (Light Theme)
   const getHealthBadge = () => {
+    if (deal.isBackWithLibertyJ) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse"></span>
+          <span>With Liberty J ({deal.daysWithLibertyJ || 0}d)</span>
+        </span>
+      );
+    }
+
     switch (deal.health) {
       case 'urgent':
         return (
@@ -76,17 +85,45 @@ export function CompactDealCard({
   return (
     <div
       onClick={() => onSelectDeal(deal)}
-      className="group relative bg-white hover:bg-slate-50/50 border border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-md rounded-xl p-3 sm:p-3.5 transition flex flex-col justify-between cursor-pointer space-y-2.5"
+      className={`group relative bg-white hover:bg-slate-50/50 border shadow-2xs hover:shadow-md rounded-xl p-3 sm:p-3.5 transition flex flex-col justify-between cursor-pointer space-y-2.5 ${
+        deal.isBackWithLibertyJ
+          ? 'border-teal-300 hover:border-teal-400 ring-1 ring-teal-200/50 bg-teal-50/10'
+          : 'border-slate-200/90 hover:border-slate-300'
+      }`}
     >
+      {/* Top Banner if Back with Liberty J */}
+      {deal.isBackWithLibertyJ && (
+        <div className="bg-gradient-to-r from-teal-500/15 via-emerald-500/10 to-teal-500/5 -mx-3 sm:-mx-3.5 -mt-3 sm:-mt-3.5 px-3 py-1.5 rounded-t-xl border-b border-teal-200/80 flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <div className="h-4 w-7 bg-white rounded border border-teal-200 p-0.5 flex items-center justify-center shrink-0 shadow-2xs">
+              <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-teal-900">
+              Back with Liberty J
+            </span>
+          </div>
+          <span className="text-[9.5px] font-bold text-teal-700 bg-teal-100/90 px-1.5 py-0.5 rounded">
+            Partner Action
+          </span>
+        </div>
+      )}
+
       {/* Top Header: Title & HubSpot link */}
       <div>
         <div className="flex items-start justify-between gap-2">
-          <h4
-            className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition truncate leading-snug flex-1"
-            title={deal.name}
-          >
-            {deal.name}
-          </h4>
+          <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+            {deal.isLibertyJ && !deal.isBackWithLibertyJ && (
+              <div className="h-3.5 w-6 bg-white rounded border border-indigo-200 p-0.5 flex items-center justify-center shrink-0" title="Sourced by Liberty J">
+                <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+              </div>
+            )}
+            <h4
+              className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition truncate leading-snug flex-1"
+              title={deal.name}
+            >
+              {deal.name}
+            </h4>
+          </div>
           <a
             href={deal.hubspotUrl}
             target="_blank"
