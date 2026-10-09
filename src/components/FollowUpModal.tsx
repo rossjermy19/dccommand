@@ -66,6 +66,13 @@ export function FollowUpModal({ deal, onClose, onLogNote }: FollowUpModalProps) 
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const handleCopyAndOpenHubSpot = () => {
+    navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    window.open(deal.hubspotUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleOpenInOutlook = () => {
     const to = recipientEmail ? encodeURIComponent(recipientEmail) : '';
     const mailtoUrl = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -200,19 +207,31 @@ export function FollowUpModal({ deal, onClose, onLogNote }: FollowUpModalProps) 
 
           {/* Action buttons */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
-            <button
-              onClick={handleCopy}
-              className="w-full sm:w-auto text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 transition"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-              <span>{copied ? 'Copied Text' : 'Copy Text'}</span>
-            </button>
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <button
+                onClick={handleCopy}
+                className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 transition"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copied ? 'Copied' : 'Copy Text'}</span>
+              </button>
+
+              <button
+                onClick={handleCopyAndOpenHubSpot}
+                className="flex items-center justify-center space-x-1.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs"
+                title="Copies draft email to clipboard and opens the deal record directly in HubSpot CRM"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>Copy & Open in HubSpot</span>
+              </button>
+            </div>
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
               <button
                 onClick={handleLogEmailToHubspot}
                 disabled={logging || logged}
-                className="flex-1 sm:flex-none text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 transition disabled:opacity-60"
+                className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 transition disabled:opacity-60"
+                title="Log this email draft as an engagement record in HubSpot CRM"
               >
                 <Send className="h-3.5 w-3.5 text-blue-600" />
                 <span>{logged ? 'Logged to HubSpot' : logging ? 'Logging...' : 'Log to HubSpot'}</span>
@@ -221,11 +240,11 @@ export function FollowUpModal({ deal, onClose, onLogNote }: FollowUpModalProps) 
               <button
                 onClick={handleSendAndLog}
                 disabled={logging}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20"
-                title="Opens in your desktop Outlook/Mail and automatically records the email touchpoint in HubSpot CRM"
+                className="flex items-center justify-center space-x-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold px-3 py-2 rounded-xl transition"
+                title="Opens in desktop mail client (Outlook/Mail)"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Open in Outlook & Log</span>
+                <span>Outlook Mailto</span>
               </button>
             </div>
           </div>
