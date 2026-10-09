@@ -86,6 +86,9 @@ export async function getOpenDeals(): Promise<Deal[]> {
       'notes_last_updated',
       'hs_latest_meeting_activity',
       'hs_sales_email_last_replied',
+      'hs_last_sales_activity_timestamp',
+      'hs_last_contacted_date',
+      'num_notes',
       'hubspot_owner_id',
       'source',
       'sub_source',
@@ -272,6 +275,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       props.notes_last_contacted ? new Date(props.notes_last_contacted).getTime() : 0,
       props.hs_latest_meeting_activity ? new Date(props.hs_latest_meeting_activity).getTime() : 0,
       props.hs_sales_email_last_replied ? new Date(props.hs_sales_email_last_replied).getTime() : 0,
+      props.hs_last_sales_activity_timestamp ? new Date(props.hs_last_sales_activity_timestamp).getTime() : 0,
+      props.hs_last_contacted_date ? new Date(props.hs_last_contacted_date).getTime() : 0,
     ].filter((t) => !isNaN(t) && t > 0);
 
     // Fall back to hs_lastmodifieddate if no explicit note/activity date is set
@@ -323,16 +328,14 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const nextMeetingDate = futureMeeting ? futureMeeting.startDateStr : null;
     const nextMeetingTitle = futureMeeting ? futureMeeting.title : null;
 
-    // Health logic
+    // Health logic - Strict 7-Day Inactivity Rule requested by Ross:
+    // If a deal has had ANY interaction/note in the last 7 days, it is healthy and cleared from the desk.
+    // It only reappears if 7 days elapse with zero interaction, or if an explicit task is due.
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
-    // 1. If contacted today, celebrate it! (e.g. email sent today)
-    if (daysSinceContact === 0) {
-      health = 'healthy';
-      healthReason = 'Contacted today via email/note';
-    } else if (futureMeeting || isMeetingBookedStage) {
-      // Meeting is booked! (e.g. Talk3PL) -> Planned follow-up in momentum
+    if (futureMeeting || isMeetingBookedStage) {
+      // 1. Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
       health = 'snoozed';
       if (futureMeeting) {
         const formattedMeetingDate = new Date(futureMeeting.start).toLocaleDateString('en-GB', {
@@ -344,6 +347,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
         healthReason = 'Meeting booked with prospect';
       }
     } else if (futureTask) {
+      // 2. Future planned follow-up task
       health = 'snoozed';
       const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -352,26 +356,24 @@ export async function getOpenDeals(): Promise<Deal[]> {
       });
       healthReason = `Planned follow-up: ${futureTask.subject} (${formattedDue})`;
     } else if (unfulfilledOverdueTask) {
+      // 3. Overdue task specifically assigned and not yet touched
       health = 'warning';
       healthReason = `Task due: ${unfulfilledOverdueTask.subject}`;
     } else if (daysSinceContact !== null && daysSinceContact >= 7) {
-      // 7-DAY REMINDER CADENCE (e.g. Marks & Spencer note without action)
+      // 4. Strict 7-Day Inactivity Rule:
+      // Remind Ross only after 7 days of complete silence/no interaction
       health = 'urgent';
       healthReason = `7-Day Review: Last note/touch ${daysSinceContact}d ago with no next action scheduled.`;
-    } else if (daysSinceContact !== null && daysSinceContact >= 4) {
-      health = 'warning';
-      healthReason = `Follow-up recommended: ${daysSinceContact}d since last touch`;
-    } else if (props.dealstage === 'presentationscheduled') {
-      // Meeting held (post-demo follow up)
-      health = 'warning';
-      healthReason = daysSinceContact === 1
-        ? 'Meeting held yesterday — commercial proposal / next step due'
-        : `Meeting held ${daysSinceContact}d ago — next step due`;
     } else {
+      // 5. Touched/noted within the last 7 days (< 7 days) -> Clean desk!
       health = 'healthy';
-      healthReason = daysSinceContact === 1
-        ? 'Touched yesterday'
-        : `Touched ${daysSinceContact}d ago`;
+      healthReason = daysSinceContact === 0
+        ? 'Contacted today via note/email/meeting'
+        : daysSinceContact === 1
+        ? 'Touched yesterday (Review in 6d)'
+        : daysSinceContact !== null
+        ? `Touched ${daysSinceContact}d ago (Review in ${7 - daysSinceContact}d)`
+        : 'In active rhythm';
     }
 
     const stageId = props.dealstage || '';

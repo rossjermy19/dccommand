@@ -66,19 +66,19 @@ export function DailyMissionControl({
     const list: MissionItem[] = [];
 
     deals.forEach((deal) => {
-      // 1. Stalled deals (Ghosting risk: >7d without contact and no future task)
+      // 1. 7-Day Inactivity Review (>=7 days without note/touch and no future task/meeting)
       if (deal.health === 'urgent') {
         list.push({
           id: `stalled_${deal.id}`,
           deal,
           type: 'stalled',
-          title: `No touchpoint in ${deal.daysSinceContact || 7} days`,
-          description: `No contact recently and no scheduled next step. Plan a follow-up date or send an email.`,
+          title: `7-Day Review: Last touch ${deal.daysSinceContact || 7}d ago`,
+          description: `No contact in ${deal.daysSinceContact || 7} days with no next step scheduled. Add a note, plan follow-up, or send email.`,
           urgency: 'high',
         });
       }
 
-      // 2. Action Due (task due today or post-meeting deliverable)
+      // 2. Action Due (unfulfilled task specifically due today or overdue)
       else if (deal.health === 'warning') {
         list.push({
           id: `action_${deal.id}`,
@@ -90,7 +90,7 @@ export function DailyMissionControl({
         });
       }
 
-      // 3. New Deals (< 14 days old or Meeting Booked)
+      // 3. Fresh Uncontacted Opportunity (< 14 days old and never contacted)
       else if (deal.isNewDeal && deal.daysSinceContact === null) {
         list.push({
           id: `new_${deal.id}`,
@@ -98,22 +98,6 @@ export function DailyMissionControl({
           type: 'new_deal',
           title: `Fresh Opportunity Landed`,
           description: `New lead in ${deal.stageLabel}. Review pre-call notes and confirm intro appointment.`,
-          urgency: 'medium',
-        });
-      }
-
-      // 4. Meeting held in last 3 days without Aligned Story saved
-      else if (
-        (deal.daysSinceContact === 1 || deal.daysSinceContact === 2) &&
-        !deal.alignedStoryReady &&
-        (deal.stage.includes('presentation') || deal.stageLabel.toLowerCase().includes('held'))
-      ) {
-        list.push({
-          id: `aligned_${deal.id}`,
-          deal,
-          type: 'aligned_story',
-          title: `Meeting held — Aligned Room Story ready`,
-          description: `Turn the Fireflies recording for ${deal.name} into the customer-facing Aligned room story.`,
           urgency: 'medium',
         });
       }
