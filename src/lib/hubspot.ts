@@ -111,9 +111,68 @@ export async function getOpenDeals(): Promise<Deal[]> {
   }
 
   const data = await response.json();
+  const rawDeals = data.results || [];
   const now = new Date().getTime();
 
-  return (data.results || []).map((item: any): Deal => {
+  // Batch fetch task associations for all deals to check for planned follow-ups
+  const dealTaskMap: Record<string, any[]> = {};
+  try {
+    if (rawDeals.length > 0) {
+      const assocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
+      });
+      if (assocRes.ok) {
+        const assocData = await assocRes.json();
+        const allTaskInputs: { id: string }[] = [];
+        const taskToDealMap: Record<string, string> = {};
+
+        (assocData.results || []).forEach((r: any) => {
+          const dealId = r.from.id;
+          (r.to || []).forEach((t: any) => {
+            const taskId = t.toObjectId.toString();
+            allTaskInputs.push({ id: taskId });
+            taskToDealMap[taskId] = dealId;
+          });
+        });
+
+        if (allTaskInputs.length > 0) {
+          const tasksRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: allTaskInputs.slice(0, 100),
+              properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
+            }),
+          });
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            (tasksData.results || []).forEach((taskItem: any) => {
+              const taskId = taskItem.id;
+              const dealId = taskToDealMap[taskId];
+              if (dealId) {
+                if (!dealTaskMap[dealId]) dealTaskMap[dealId] = [];
+                dealTaskMap[dealId].push({
+                  id: taskId,
+                  subject: taskItem.properties?.hs_task_subject || 'Task',
+                  status: taskItem.properties?.hs_task_status || 'NOT_STARTED',
+                  due: taskItem.properties?.hs_timestamp
+                    ? new Date(taskItem.properties.hs_timestamp).getTime()
+                    : 0,
+                  dueStr: taskItem.properties?.hs_timestamp || null,
+                });
+              }
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to batch fetch tasks for deals:', err);
+  }
+
+  return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
 
     // Collect all touchpoint and note timestamps
@@ -137,16 +196,47 @@ export async function getOpenDeals(): Promise<Deal[]> {
       daysSinceContact = Math.max(0, Math.floor((now - latestTouchTime) / (1000 * 60 * 60 * 24)));
     }
 
+    // Task inspection for planned follow-up
+    const dealTasks = dealTaskMap[item.id] || [];
+    const openTasks = dealTasks.filter((t) => t.status !== 'COMPLETED');
+    openTasks.sort((a, b) => a.due - b.due);
+
+    const futureTask = openTasks.find((t) => t.due >= now);
+    const overdueOrTodayTask = openTasks.find((t) => t.due < now && t.due > 0);
+
+    let nextTaskDate: string | null = null;
+    let nextTaskSubject: string | null = null;
+
+    if (futureTask) {
+      nextTaskDate = futureTask.dueStr;
+      nextTaskSubject = futureTask.subject;
+    } else if (openTasks.length > 0) {
+      nextTaskDate = openTasks[0].dueStr;
+      nextTaskSubject = openTasks[0].subject;
+    }
+
     // Health logic
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
-    if (daysSinceContact !== null && daysSinceContact >= 7) {
+    // 1. If there is a scheduled future task, it is PLANNED / SNOOZED (NOT a ghosting risk!)
+    if (futureTask) {
+      health = 'snoozed';
+      const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      healthReason = `Planned follow-up: ${futureTask.subject} (${formattedDue})`;
+    } else if (overdueOrTodayTask) {
+      health = 'warning';
+      healthReason = `Task due today / overdue: ${overdueOrTodayTask.subject}`;
+    } else if (daysSinceContact !== null && daysSinceContact >= 7) {
       health = 'urgent';
-      healthReason = `Ghosting risk: No touchpoint in ${daysSinceContact} days`;
+      healthReason = `Ghosting risk: No touchpoint in ${daysSinceContact}d & no task scheduled`;
     } else if (daysSinceContact !== null && daysSinceContact >= 4) {
       health = 'warning';
-      healthReason = `Follow-up recommended: ${daysSinceContact} days since last touch`;
+      healthReason = `Follow-up recommended: ${daysSinceContact}d since last touch`;
     } else if (props.dealstage === 'presentationscheduled' || props.dealstage === '1209215206') {
       // Meeting was held or booked recently (0-3 days)
       health = 'warning';
@@ -182,6 +272,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       healthReason,
       ownerId: props.hubspot_owner_id,
       hubspotUrl: `https://app-eu1.hubspot.com/contacts/145683546/record/0-3/${item.id}`,
+      nextTaskDate,
+      nextTaskSubject,
     };
   });
 }
