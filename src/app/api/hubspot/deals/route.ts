@@ -11,6 +11,7 @@ export async function GET() {
     const urgentCount = deals.filter((d) => d.health === 'urgent').length;
     const warningCount = deals.filter((d) => d.health === 'warning').length;
     const healthyCount = deals.filter((d) => d.health === 'healthy').length;
+    const snoozedCount = deals.filter((d) => d.health === 'snoozed').length;
 
     return NextResponse.json({
       success: true,
@@ -20,6 +21,7 @@ export async function GET() {
         urgentCount,
         warningCount,
         healthyCount,
+        snoozedCount,
       },
       deals,
     });

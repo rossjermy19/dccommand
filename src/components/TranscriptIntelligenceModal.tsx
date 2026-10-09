@@ -38,6 +38,64 @@ export function TranscriptIntelligenceModal({
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fireflies Integration State
+  const [inputMode, setInputMode] = useState<'paste' | 'fireflies'>('paste');
+  const [firefliesCalls, setFirefliesCalls] = useState<any[]>([]);
+  const [hasFirefliesKey, setHasFirefliesKey] = useState<boolean>(false);
+  const [loadingFireflies, setLoadingFireflies] = useState(false);
+  const [loadingCallId, setLoadingCallId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchFirefliesCalls();
+    }
+  }, [isOpen]);
+
+  const fetchFirefliesCalls = async () => {
+    setLoadingFireflies(true);
+    try {
+      const res = await fetch('/api/fireflies/transcripts');
+      const data = await res.json();
+      if (data.success) {
+        setHasFirefliesKey(data.hasApiKey);
+        setFirefliesCalls(data.transcripts || []);
+        if (data.hasApiKey && data.transcripts?.length > 0) {
+          setInputMode('fireflies');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load Fireflies calls:', e);
+    } finally {
+      setLoadingFireflies(false);
+    }
+  };
+
+  const handleSelectFirefliesCall = async (call: any) => {
+    setLoadingCallId(call.id);
+    try {
+      const res = await fetch(`/api/fireflies/transcripts?id=${call.id}`);
+      const data = await res.json();
+      if (data.success && data.fullText) {
+        setTranscriptText(data.fullText);
+        setInputMode('paste'); // Switch to preview
+
+        // Try to match deal name with call title
+        const matchedDeal = deals.find(
+          (d) =>
+            call.title.toLowerCase().includes(d.name.toLowerCase().split('-')[0].trim()) ||
+            d.name.toLowerCase().includes(call.title.toLowerCase().split(' ')[0])
+        );
+        if (matchedDeal) {
+          setSelectedDealId(matchedDeal.id);
+        }
+      }
+    } catch (e) {
+      alert('Failed to load call transcript from Fireflies.');
+    } finally {
+      setLoadingCallId(null);
+    }
+  };
+
   useEffect(() => {
     if (preselectedDeal) {
       setSelectedDealId(preselectedDeal.id);
@@ -182,40 +240,146 @@ export function TranscriptIntelligenceModal({
             </select>
           </div>
 
-          {/* Transcript Input */}
+          {/* Input Method Selector & Form */}
           {!analysisResult && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Paste Fireflies / Call Transcript
-                </label>
-                <span className="text-xs text-slate-500">Supports text, VTT, or call summary</span>
+            <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex items-center space-x-2 border-b border-slate-800 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('paste')}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                    inputMode === 'paste'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                      : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  Paste Transcript / Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputMode('fireflies');
+                    fetchFirefliesCalls();
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center space-x-1.5 ${
+                    inputMode === 'fireflies'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                      : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Import from Fireflies (Live API)</span>
+                </button>
               </div>
-              <textarea
-                rows={8}
-                value={transcriptText}
-                onChange={(e) => setTranscriptText(e.target.value)}
-                placeholder="Paste the meeting transcript here... e.g.:&#10;Ross: Hi Mike, thanks for jumping on. How are things running with your current warehouse setup?&#10;Mike: We're doing about 2,000 orders a day and our current system keeps failing to sync with Royal Mail..."
-                className="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-4 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
-              />
 
-              {error && (
-                <div className="mt-2 text-xs text-rose-400 flex items-center space-x-1.5">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{error}</span>
+              {/* FIREFLIES MODE */}
+              {inputMode === 'fireflies' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Recent Fireflies Recordings</span>
+                    <button
+                      onClick={fetchFirefliesCalls}
+                      className="text-blue-400 hover:underline"
+                    >
+                      Refresh Calls
+                    </button>
+                  </div>
+
+                  {loadingFireflies ? (
+                    <div className="py-12 text-center text-slate-400 text-xs">
+                      Fetching recent recordings from Fireflies.ai...
+                    </div>
+                  ) : firefliesCalls.length === 0 ? (
+                    <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-2">
+                      <p className="text-xs text-slate-300">
+                        {hasFirefliesKey
+                          ? 'No recent meetings found in your Fireflies account.'
+                          : 'FIREFLIES_API_KEY is not yet detected in environment variables.'}
+                      </p>
+                      <button
+                        onClick={() => setInputMode('paste')}
+                        className="text-xs text-blue-400 hover:underline font-semibold"
+                      >
+                        Switch to Paste Transcript
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {firefliesCalls.map((call) => {
+                        const callDate = new Date(call.date).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                        const isLoadingThis = loadingCallId === call.id;
+
+                        return (
+                          <div
+                            key={call.id}
+                            className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between gap-3 transition group"
+                          >
+                            <div>
+                              <h4 className="text-xs font-semibold text-white group-hover:text-blue-400 transition">
+                                {call.title}
+                              </h4>
+                              <p className="text-[11px] text-slate-500 mt-0.5">{callDate}</p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSelectFirefliesCall(call)}
+                              disabled={isLoadingThis}
+                              className="flex items-center space-x-1.5 text-xs bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg transition"
+                            >
+                              <Sparkles className="h-3 w-3 text-cyan-400" />
+                              <span>{isLoadingThis ? 'Importing...' : 'Select & Analyze'}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-lg shadow-blue-500/25 disabled:opacity-50"
-                >
-                  <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                  <span>{isAnalyzing ? 'Analyzing with Intelligence Engine...' : 'Run Intelligence Analysis'}</span>
-                </button>
-              </div>
+              {/* PASTE MODE */}
+              {inputMode === 'paste' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                      Transcript / Call Text
+                    </label>
+                    <span className="text-xs text-slate-500">Supports text, VTT, or notes</span>
+                  </div>
+                  <textarea
+                    rows={8}
+                    value={transcriptText}
+                    onChange={(e) => setTranscriptText(e.target.value)}
+                    placeholder="Paste the meeting transcript here... e.g.:&#10;Ross: Hi Mike, thanks for jumping on. How are things running with your current warehouse setup?&#10;Mike: We're doing about 2,000 orders a day and our current system keeps failing to sync with Royal Mail..."
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-4 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+
+                  {error && (
+                    <div className="mt-2 text-xs text-rose-400 flex items-center space-x-1.5">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={isAnalyzing}
+                      className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                    >
+                      <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                      <span>{isAnalyzing ? 'Analyzing with Intelligence Engine...' : 'Run Intelligence Analysis'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

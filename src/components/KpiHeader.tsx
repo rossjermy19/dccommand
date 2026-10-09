@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { DollarSign, AlertCircle, Clock, ShieldCheck, TrendingUp } from 'lucide-react';
+import { DollarSign, AlertCircle, Clock, ShieldCheck, TrendingUp, CalendarCheck } from 'lucide-react';
 
 interface KpiHeaderProps {
   stats: {
@@ -10,6 +10,7 @@ interface KpiHeaderProps {
     urgentCount: number;
     warningCount: number;
     healthyCount: number;
+    snoozedCount?: number;
   };
   filter: string;
   onSelectFilter: (filter: string) => void;
@@ -41,7 +42,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
         <p className="text-xs text-slate-400 mt-1">{stats.totalDeals} open deals managed</p>
       </div>
 
-      {/* Critical / Ghosting (> 7 days) */}
+      {/* Critical / True Ghosting (> 7 days AND no task) */}
       <div 
         onClick={() => onSelectFilter('urgent')}
         className={`p-4 rounded-xl border transition cursor-pointer ${
@@ -51,11 +52,11 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
         }`}
       >
         <div className="flex items-center justify-between text-rose-400 mb-1">
-          <span className="text-xs font-semibold uppercase tracking-wider">Ghosting Alert</span>
+          <span className="text-xs font-semibold uppercase tracking-wider">Unplanned Stalled</span>
           <AlertCircle className="h-4 w-4 text-rose-400" />
         </div>
         <div className="text-2xl font-bold text-rose-200 tracking-tight">{stats.urgentCount}</div>
-        <p className="text-xs text-rose-400/80 mt-1">&gt; 7 days without contact</p>
+        <p className="text-xs text-rose-400/80 mt-1">&gt; 7d & no task scheduled</p>
       </div>
 
       {/* Warning / Follow-up Due */}
@@ -72,7 +73,26 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           <Clock className="h-4 w-4 text-amber-400" />
         </div>
         <div className="text-2xl font-bold text-amber-200 tracking-tight">{stats.warningCount}</div>
-        <p className="text-xs text-amber-400/80 mt-1">4-6 days or post-meeting</p>
+        <p className="text-xs text-amber-400/80 mt-1">Due today or post-meeting</p>
+      </div>
+
+      {/* Planned Follow-ups / Scheduled */}
+      <div 
+        onClick={() => onSelectFilter('snoozed')}
+        className={`p-4 rounded-xl border transition cursor-pointer ${
+          filter === 'snoozed'
+            ? 'bg-indigo-950/40 border-indigo-500/80 shadow-md shadow-indigo-500/10'
+            : 'bg-slate-900/60 border-slate-800/80 hover:border-indigo-900/40'
+        }`}
+      >
+        <div className="flex items-center justify-between text-indigo-400 mb-1">
+          <span className="text-xs font-semibold uppercase tracking-wider">Planned Follow-up</span>
+          <CalendarCheck className="h-4 w-4 text-indigo-400" />
+        </div>
+        <div className="text-2xl font-bold text-indigo-200 tracking-tight">
+          {stats.snoozedCount || 0}
+        </div>
+        <p className="text-xs text-indigo-400/80 mt-1">Dealt with / task scheduled</p>
       </div>
 
       {/* Active Rhythm (< 3 days) */}
@@ -89,24 +109,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
         </div>
         <div className="text-2xl font-bold text-emerald-200 tracking-tight">{stats.healthyCount}</div>
-        <p className="text-xs text-emerald-400/80 mt-1">Contacted within 3 days</p>
-      </div>
-
-      {/* Total Active Deals Count */}
-      <div 
-        onClick={() => onSelectFilter('all')}
-        className={`p-4 rounded-xl border transition cursor-pointer ${
-          filter === 'all'
-            ? 'bg-slate-900 border-indigo-500/50'
-            : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
-        }`}
-      >
-        <div className="flex items-center justify-between text-indigo-400 mb-1">
-          <span className="text-xs font-semibold uppercase tracking-wider">Active Deals</span>
-          <span className="text-xs bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono">LIVE</span>
-        </div>
-        <div className="text-2xl font-bold text-white tracking-tight">{stats.totalDeals}</div>
-        <p className="text-xs text-slate-400 mt-1">Click to view all</p>
+        <p className="text-xs text-emerald-400/80 mt-1">Touched within 3 days</p>
       </div>
     </div>
   );

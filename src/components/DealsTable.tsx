@@ -11,7 +11,8 @@ import {
   ArrowUpDown,
   CheckCircle,
   AlertCircle,
-  Clock
+  Clock,
+  Calendar
 } from 'lucide-react';
 
 interface DealsTableProps {
@@ -198,6 +199,12 @@ export function DealsTable({
                         <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30">
                           <Clock className="h-3 w-3" />
                           <span>Action Due</span>
+                        </span>
+                      )}
+                      {deal.health === 'snoozed' && (
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                          <Calendar className="h-3 w-3" />
+                          <span>Planned Follow-up</span>
                         </span>
                       )}
                       {deal.health === 'healthy' && (
