@@ -1,4 +1,4 @@
-import { Deal, DealContact, DealNote, DealTask, DealEmail, PipelineStage } from './types';
+import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 
@@ -6,7 +6,7 @@ const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
 const OWNER_ID = process.env.HUBSPOT_OWNER_ID || '75550922';
 
-const STAGE_LABELS: Record<string, string> = {
+export const STAGE_LABELS: Record<string, string> = {
   // Default sales pipeline
   '1209215206': 'Meeting Booked',
   'presentationscheduled': 'Meeting Held',
@@ -116,13 +116,26 @@ export async function getOpenDeals(): Promise<Deal[]> {
   }
 
   const data = await response.json();
-  const rawDeals = data.results || [];
+  const allResults = data.results || [];
   const now = new Date().getTime();
 
-  // Batch fetch task associations for all deals to check for planned follow-ups
+  // Strictly filter out ANY Closed Lost deals
+  const rawDeals = allResults.filter((item: any) => {
+    const stageId = (item.properties?.dealstage || '').toLowerCase();
+    const stageLabel = (stageLabels[stageId] || STAGE_LABELS[stageId] || '').toLowerCase();
+    if (stageId === 'closedlost' || stageId.includes('lost') || stageLabel.includes('lost')) {
+      return false;
+    }
+    return true;
+  });
+
+  // Batch fetch task and meeting associations for all deals to check for planned follow-ups
   const dealTaskMap: Record<string, any[]> = {};
+  const dealMeetingMap: Record<string, any[]> = {};
+
   try {
     if (rawDeals.length > 0) {
+      // 1. Fetch Task Associations
       const assocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
@@ -172,9 +185,60 @@ export async function getOpenDeals(): Promise<Deal[]> {
           }
         }
       }
+
+      // 2. Fetch Meeting Associations
+      const meetingAssocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/meetings/batch/read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
+      });
+      if (meetingAssocRes.ok) {
+        const meetingAssocData = await meetingAssocRes.json();
+        const allMeetingInputs: { id: string }[] = [];
+        const meetingToDealMap: Record<string, string> = {};
+
+        (meetingAssocData.results || []).forEach((r: any) => {
+          const dealId = r.from.id;
+          (r.to || []).forEach((m: any) => {
+            const mId = m.toObjectId.toString();
+            allMeetingInputs.push({ id: mId });
+            meetingToDealMap[mId] = dealId;
+          });
+        });
+
+        if (allMeetingInputs.length > 0) {
+          const meetingsRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: allMeetingInputs.slice(0, 100),
+              properties: ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_outcome'],
+            }),
+          });
+          if (meetingsRes.ok) {
+            const meetingsData = await meetingsRes.json();
+            (meetingsData.results || []).forEach((mItem: any) => {
+              const dealId = meetingToDealMap[mItem.id];
+              if (dealId) {
+                if (!dealMeetingMap[dealId]) dealMeetingMap[dealId] = [];
+                const startMs = mItem.properties?.hs_meeting_start_time
+                  ? new Date(mItem.properties.hs_meeting_start_time).getTime()
+                  : 0;
+                dealMeetingMap[dealId].push({
+                  id: mItem.id,
+                  title: mItem.properties?.hs_meeting_title || 'Booked Meeting',
+                  start: startMs,
+                  startDateStr: mItem.properties?.hs_meeting_start_time || null,
+                  outcome: mItem.properties?.hs_meeting_outcome || null,
+                });
+              }
+            });
+          }
+        }
+      }
     }
   } catch (err) {
-    console.warn('Failed to batch fetch tasks for deals:', err);
+    console.warn('Failed to batch fetch tasks/meetings for deals:', err);
   }
 
   const customTagsMap = getCustomTagsMap();
@@ -230,9 +294,14 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
     const futureTask = openTasks.find((t) => t.due >= now);
 
+    // Meeting inspection for planned follow-up (e.g. Talk3PL)
+    const dealMeetings = dealMeetingMap[item.id] || [];
+    dealMeetings.sort((a, b) => a.start - b.start);
+    const futureMeeting = dealMeetings.find((m) => m.start >= now);
+
+    const isMeetingBookedStage = props.dealstage === '1209215206' || (stageLabels[props.dealstage] || '').toLowerCase().includes('meeting booked');
+
     // An overdue task is ONLY active if it has NOT been fulfilled by a subsequent contact!
-    // If the contact occurred AFTER the task was due, or if touched TODAY (daysSinceContact === 0),
-    // the task has been fulfilled by the communication!
     const unfulfilledOverdueTask = openTasks.find((t) => {
       if (t.due >= now) return false;
       if (daysSinceContact === 0) return false; // touched today!
@@ -251,6 +320,9 @@ export async function getOpenDeals(): Promise<Deal[]> {
       nextTaskSubject = openTasks[0].subject;
     }
 
+    const nextMeetingDate = futureMeeting ? futureMeeting.startDateStr : null;
+    const nextMeetingTitle = futureMeeting ? futureMeeting.title : null;
+
     // Health logic
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
@@ -259,6 +331,18 @@ export async function getOpenDeals(): Promise<Deal[]> {
     if (daysSinceContact === 0) {
       health = 'healthy';
       healthReason = 'Contacted today via email/note';
+    } else if (futureMeeting || isMeetingBookedStage) {
+      // Meeting is booked! (e.g. Talk3PL) -> Planned follow-up in momentum
+      health = 'snoozed';
+      if (futureMeeting) {
+        const formattedMeetingDate = new Date(futureMeeting.start).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+        });
+        healthReason = `Meeting booked: ${futureMeeting.title} (${formattedMeetingDate})`;
+      } else {
+        healthReason = 'Meeting booked with prospect';
+      }
     } else if (futureTask) {
       health = 'snoozed';
       const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
@@ -271,16 +355,17 @@ export async function getOpenDeals(): Promise<Deal[]> {
       health = 'warning';
       healthReason = `Task due: ${unfulfilledOverdueTask.subject}`;
     } else if (daysSinceContact !== null && daysSinceContact >= 7) {
+      // 7-DAY REMINDER CADENCE (e.g. Marks & Spencer note without action)
       health = 'urgent';
-      healthReason = `Ghosting risk: No touchpoint in ${daysSinceContact}d & no task scheduled`;
+      healthReason = `7-Day Review: Last note/touch ${daysSinceContact}d ago with no next action scheduled.`;
     } else if (daysSinceContact !== null && daysSinceContact >= 4) {
       health = 'warning';
       healthReason = `Follow-up recommended: ${daysSinceContact}d since last touch`;
-    } else if (props.dealstage === 'presentationscheduled' || props.dealstage === '1209215206') {
-      // Meeting was held or booked recently (0-3 days)
+    } else if (props.dealstage === 'presentationscheduled') {
+      // Meeting held (post-demo follow up)
       health = 'warning';
       healthReason = daysSinceContact === 1
-        ? 'Meeting held yesterday — next step / proposal due'
+        ? 'Meeting held yesterday — commercial proposal / next step due'
         : `Meeting held ${daysSinceContact}d ago — next step due`;
     } else {
       health = 'healthy';
@@ -309,6 +394,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       hubspotUrl: `https://app-eu1.hubspot.com/contacts/145683546/record/0-3/${item.id}`,
       nextTaskDate,
       nextTaskSubject,
+      nextMeetingDate,
+      nextMeetingTitle,
       source: rawSource,
       subSource: rawSubSource,
       tags,
@@ -321,18 +408,20 @@ export async function getOpenDeals(): Promise<Deal[]> {
 }
 
 /**
- * Fetch detailed view for a single deal (Notes, Tasks, Contacts, Emails)
+ * Fetch detailed view for a single deal (Notes, Tasks, Contacts, Emails, Meetings, Calls)
  */
 export async function getDealDetails(dealId: string): Promise<{
   notes: DealNote[];
   tasks: DealTask[];
   contacts: DealContact[];
   emails: DealEmail[];
+  meetings: DealMeeting[];
+  calls: DealCall[];
 }> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
   // Fetch associations concurrently
-  const [notesAssocRes, tasksAssocRes, contactsAssocRes, emailsAssocRes] = await Promise.all([
+  const [notesAssocRes, tasksAssocRes, contactsAssocRes, emailsAssocRes, meetingsAssocRes, callsAssocRes] = await Promise.all([
     fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
@@ -345,22 +434,32 @@ export async function getDealDetails(dealId: string): Promise<{
     fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/emails`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/meetings`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/calls`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
   ]);
 
-  const [notesAssoc, tasksAssoc, contactsAssoc, emailsAssoc] = await Promise.all([
+  const [notesAssoc, tasksAssoc, contactsAssoc, emailsAssoc, meetingsAssoc, callsAssoc] = await Promise.all([
     notesAssocRes.ok ? notesAssocRes.json() : { results: [] },
     tasksAssocRes.ok ? tasksAssocRes.json() : { results: [] },
     contactsAssocRes.ok ? contactsAssocRes.json() : { results: [] },
     emailsAssocRes.ok ? emailsAssocRes.json() : { results: [] },
+    meetingsAssocRes.ok ? meetingsAssocRes.json() : { results: [] },
+    callsAssocRes.ok ? callsAssocRes.json() : { results: [] },
   ]);
 
   const noteIds = (notesAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
   const taskIds = (tasksAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
   const contactIds = (contactsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
   const emailIds = (emailsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+  const meetingIds = (meetingsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+  const callIds = (callsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
 
   // Fetch batch details
-  const [notesBatchRes, tasksBatchRes, contactsBatchRes, emailsBatchRes] = await Promise.all([
+  const [notesBatchRes, tasksBatchRes, contactsBatchRes, emailsBatchRes, meetingsBatchRes, callsBatchRes] = await Promise.all([
     noteIds.length > 0
       ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/batch/read`, {
           method: 'POST',
@@ -408,13 +507,35 @@ export async function getDealDetails(dealId: string): Promise<{
           }),
         })
       : null,
+    meetingIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: meetingIds,
+            properties: ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_createdate'],
+          }),
+        })
+      : null,
+    callIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: callIds,
+            properties: ['hs_call_title', 'hs_call_body', 'hs_call_disposition', 'hs_call_duration', 'hs_timestamp', 'hs_createdate'],
+          }),
+        })
+      : null,
   ]);
 
-  const [notesBatch, tasksBatch, contactsBatch, emailsBatch] = await Promise.all([
+  const [notesBatch, tasksBatch, contactsBatch, emailsBatch, meetingsBatch, callsBatch] = await Promise.all([
     notesBatchRes?.ok ? notesBatchRes.json() : { results: [] },
     tasksBatchRes?.ok ? tasksBatchRes.json() : { results: [] },
     contactsBatchRes?.ok ? contactsBatchRes.json() : { results: [] },
     emailsBatchRes?.ok ? emailsBatchRes.json() : { results: [] },
+    meetingsBatchRes?.ok ? meetingsBatchRes.json() : { results: [] },
+    callsBatchRes?.ok ? callsBatchRes.json() : { results: [] },
   ]);
 
   const notes: DealNote[] = (notesBatch.results || [])
@@ -467,7 +588,36 @@ export async function getDealDetails(dealId: string): Promise<{
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-  return { notes, tasks, contacts, emails };
+  const meetings: DealMeeting[] = (meetingsBatch.results || [])
+    .map((item: any) => ({
+      id: item.id,
+      title: item.properties?.hs_meeting_title || 'Meeting',
+      body: item.properties?.hs_meeting_body || '',
+      startTime: item.properties?.hs_meeting_start_time || null,
+      endTime: item.properties?.hs_meeting_end_time || null,
+      outcome: item.properties?.hs_meeting_outcome || null,
+      createdAt: item.properties?.hs_createdate || item.createdAt,
+    }))
+    .sort(
+      (a: DealMeeting, b: DealMeeting) =>
+        new Date(b.startTime || b.createdAt).getTime() - new Date(a.startTime || a.createdAt).getTime()
+    );
+
+  const calls: DealCall[] = (callsBatch.results || [])
+    .map((item: any) => ({
+      id: item.id,
+      title: item.properties?.hs_call_title || 'Call',
+      body: item.properties?.hs_call_body || '',
+      disposition: item.properties?.hs_call_disposition || null,
+      duration: item.properties?.hs_call_duration ? parseInt(item.properties.hs_call_duration) : null,
+      timestamp: item.properties?.hs_timestamp || item.createdAt,
+    }))
+    .sort(
+      (a: DealCall, b: DealCall) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+  return { notes, tasks, contacts, emails, meetings, calls };
 }
 
 export async function addDealNote(dealId: string, noteBody: string): Promise<any> {
@@ -615,5 +765,234 @@ export async function updateDealSource(dealId: string, subSourceOrTag: string): 
     console.error('Failed to update deal sub_source in HubSpot:', err);
     return true; // Still persisted locally
   }
+}
+
+export async function updateDealStage(dealId: string, stage: string): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      properties: {
+        dealstage: stage,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update deal stage in HubSpot: ${errorText}`);
+  }
+
+  return response.json();
+}
+
+export async function createDealMeeting(
+  dealId: string,
+  meeting: {
+    title: string;
+    body?: string;
+    startTime: string; // ISO string or datetime-local
+    endTime?: string;
+    contactId?: string;
+  }
+): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const startDate = new Date(meeting.startTime);
+  const endDate = meeting.endTime
+    ? new Date(meeting.endTime)
+    : new Date(startDate.getTime() + 30 * 60000);
+
+  const associations: any[] = [
+    {
+      to: { id: dealId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 212, // Meeting to Deal
+        },
+      ],
+    },
+  ];
+
+  if (meeting.contactId) {
+    associations.push({
+      to: { id: meeting.contactId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 200, // Meeting to Contact
+        },
+      ],
+    });
+  }
+
+  const payload = {
+    properties: {
+      hs_meeting_title: meeting.title,
+      hs_meeting_body: meeting.body || '',
+      hs_meeting_start_time: startDate.toISOString(),
+      hs_meeting_end_time: endDate.toISOString(),
+      hs_meeting_outcome: 'SCHEDULED',
+      hubspot_owner_id: OWNER_ID,
+    },
+    associations,
+  };
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to create meeting in HubSpot: ${errorText}`);
+  }
+
+  // Also auto-update deal stage to '1209215206' (Meeting Booked) in HubSpot
+  try {
+    await updateDealStage(dealId, '1209215206');
+  } catch (e) {
+    console.warn('Could not auto-advance deal stage to Meeting Booked:', e);
+  }
+
+  return response.json();
+}
+
+export async function createDealCall(
+  dealId: string,
+  call: {
+    title: string;
+    body?: string;
+    outcome?: string;
+    contactId?: string;
+    duration?: number;
+  }
+): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const associations: any[] = [
+    {
+      to: { id: dealId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 206, // Call to Deal
+        },
+      ],
+    },
+  ];
+
+  if (call.contactId) {
+    associations.push({
+      to: { id: call.contactId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 194, // Call to Contact
+        },
+      ],
+    });
+  }
+
+  const payload = {
+    properties: {
+      hs_call_title: call.title,
+      hs_call_body: call.body || '',
+      hs_call_status: 'COMPLETED',
+      hs_call_disposition: call.outcome || 'f240cda9-c59d-4076-947f-f7288e46cf77', // Connected
+      hs_timestamp: new Date().toISOString(),
+      hs_call_duration: call.duration ? (call.duration * 60).toString() : '900', // seconds
+      hubspot_owner_id: OWNER_ID,
+    },
+    associations,
+  };
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to log call in HubSpot: ${errorText}`);
+  }
+
+  return response.json();
+}
+
+export async function logDealEmail(
+  dealId: string,
+  email: {
+    subject: string;
+    body: string;
+    contactId?: string;
+  }
+): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const associations: any[] = [
+    {
+      to: { id: dealId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 210, // Email to Deal
+        },
+      ],
+    },
+  ];
+
+  if (email.contactId) {
+    associations.push({
+      to: { id: email.contactId },
+      types: [
+        {
+          associationCategory: 'HUBSPOT_DEFINED',
+          associationTypeId: 198, // Email to Contact
+        },
+      ],
+    });
+  }
+
+  const payload = {
+    properties: {
+      hs_email_subject: email.subject,
+      hs_email_text: email.body,
+      hs_email_direction: 'EMAIL',
+      hs_timestamp: new Date().toISOString(),
+      hubspot_owner_id: OWNER_ID,
+    },
+    associations,
+  };
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to log email in HubSpot: ${errorText}`);
+  }
+
+  return response.json();
 }
 

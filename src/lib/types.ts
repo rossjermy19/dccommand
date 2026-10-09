@@ -32,6 +32,25 @@ export interface DealEmail {
   timestamp: string;
 }
 
+export interface DealMeeting {
+  id: string;
+  title: string;
+  body?: string;
+  startTime: string | null;
+  endTime?: string | null;
+  outcome?: string | null;
+  createdAt: string;
+}
+
+export interface DealCall {
+  id: string;
+  title: string;
+  body?: string;
+  disposition?: string | null;
+  duration?: number | null;
+  timestamp: string;
+}
+
 export interface Deal {
   id: string;
   name: string;
@@ -49,6 +68,8 @@ export interface Deal {
   hubspotUrl: string;
   nextTaskDate?: string | null;
   nextTaskSubject?: string | null;
+  nextMeetingDate?: string | null;
+  nextMeetingTitle?: string | null;
   associatedContacts?: DealContact[];
   source?: string | null;
   subSource?: string | null;
@@ -84,3 +105,18 @@ export interface TranscriptAnalysisResult {
     body: string;
   };
 }
+
+export const PIPELINE_STAGES = [
+  { id: '1209215206', label: 'Meeting Booked' },
+  { id: 'presentationscheduled', label: 'Meeting Held' },
+  { id: '1465977055', label: 'Upside' },
+  { id: '1965601015', label: 'Expected to close' },
+  { id: 'decisionmakerboughtin', label: 'Committed' },
+  { id: 'contractsent', label: 'Contract Sent' },
+  { id: 'closedwon', label: 'Closed Won' },
+  { id: '1352329432', label: 'No Response - After Meeting' },
+  { id: 'qualifiedtobuy', label: 'Qualified To Buy' },
+  { id: '5536133318', label: 'Back Burner' },
+  { id: '5030008022', label: 'Evaluation / Follow-up' },
+  { id: '1638150379', label: 'Proposal / Active Review' },
+];

@@ -493,6 +493,28 @@ export function DailyMissionControl({
                       </button>
                     )}
 
+                    {/* Resolution Action 4: Quick Mark Meeting Booked in HubSpot */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          await fetch(`/api/hubspot/deal/${mission.deal.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stage: '1209215206' }),
+                          });
+                          clearMission(mission.id);
+                          if (onRefreshDeals) onRefreshDeals();
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="flex items-center space-x-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-blue-200 transition"
+                      title="Move deal to Meeting Booked in HubSpot CRM"
+                    >
+                      <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Meeting Booked</span>
+                    </button>
+
                     {/* Timeline Drawer */}
                     <button
                       onClick={() => onSelectDeal(mission.deal)}
