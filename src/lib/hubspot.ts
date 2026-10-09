@@ -1,4 +1,4 @@
-import { Deal, PipelineStage } from './types';
+import { Deal, DealContact, DealNote, DealTask, PipelineStage } from './types';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -138,7 +138,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
     }
 
     // Health logic
-    let health: 'urgent' | 'warning' | 'healthy' | 'neutral' = 'healthy';
+    let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
     if (daysSinceContact !== null && daysSinceContact >= 7) {
@@ -186,10 +186,129 @@ export async function getOpenDeals(): Promise<Deal[]> {
   });
 }
 
+/**
+ * Fetch detailed view for a single deal (Notes, Tasks, Contacts)
+ */
+export async function getDealDetails(dealId: string): Promise<{
+  notes: DealNote[];
+  tasks: DealTask[];
+  contacts: DealContact[];
+}> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  // Fetch associations concurrently
+  const [notesAssocRes, tasksAssocRes, contactsAssocRes] = await Promise.all([
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/notes`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/contacts`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
+  ]);
+
+  const [notesAssoc, tasksAssoc, contactsAssoc] = await Promise.all([
+    notesAssocRes.ok ? notesAssocRes.json() : { results: [] },
+    tasksAssocRes.ok ? tasksAssocRes.json() : { results: [] },
+    contactsAssocRes.ok ? contactsAssocRes.json() : { results: [] },
+  ]);
+
+  const noteIds = (notesAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+  const taskIds = (tasksAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+  const contactIds = (contactsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+
+  // Fetch batch details
+  const [notesBatchRes, tasksBatchRes, contactsBatchRes] = await Promise.all([
+    noteIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: noteIds,
+            properties: ['hs_note_body', 'hs_timestamp', 'hs_createdate'],
+          }),
+        })
+      : null,
+    taskIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: taskIds,
+            properties: [
+              'hs_task_subject',
+              'hs_task_body',
+              'hs_task_status',
+              'hs_task_priority',
+              'hs_timestamp',
+              'hs_createdate',
+            ],
+          }),
+        })
+      : null,
+    contactIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/contacts/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: contactIds,
+            properties: ['firstname', 'lastname', 'email', 'jobtitle', 'phone'],
+          }),
+        })
+      : null,
+  ]);
+
+  const [notesBatch, tasksBatch, contactsBatch] = await Promise.all([
+    notesBatchRes?.ok ? notesBatchRes.json() : { results: [] },
+    tasksBatchRes?.ok ? tasksBatchRes.json() : { results: [] },
+    contactsBatchRes?.ok ? contactsBatchRes.json() : { results: [] },
+  ]);
+
+  const notes: DealNote[] = (notesBatch.results || [])
+    .map((item: any) => ({
+      id: item.id,
+      body: item.properties?.hs_note_body || '',
+      createdAt: item.properties?.hs_createdate || item.createdAt,
+      timestamp: item.properties?.hs_timestamp || item.createdAt,
+    }))
+    .sort(
+      (a: DealNote, b: DealNote) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+  const tasks: DealTask[] = (tasksBatch.results || [])
+    .map((item: any) => ({
+      id: item.id,
+      subject: item.properties?.hs_task_subject || 'Untitled Task',
+      body: item.properties?.hs_task_body || '',
+      status: item.properties?.hs_task_status || 'NOT_STARTED',
+      priority: item.properties?.hs_task_priority || 'MEDIUM',
+      dueDate: item.properties?.hs_timestamp || null,
+      createdAt: item.properties?.hs_createdate || item.createdAt,
+    }))
+    .sort((a: DealTask, b: DealTask) => {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+
+  const contacts: DealContact[] = (contactsBatch.results || []).map((item: any) => ({
+    id: item.id,
+    firstName: item.properties?.firstname || '',
+    lastName: item.properties?.lastname || '',
+    email: item.properties?.email || '',
+    jobTitle: item.properties?.jobtitle || '',
+    phone: item.properties?.phone || '',
+  }));
+
+  return { notes, tasks, contacts };
+}
+
 export async function addDealNote(dealId: string, noteBody: string): Promise<any> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
-  // Create Note
   const notePayload = {
     properties: {
       hs_timestamp: new Date().toISOString(),
@@ -220,6 +339,86 @@ export async function addDealNote(dealId: string, noteBody: string): Promise<any
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to create note: ${errorText}`);
+  }
+
+  return response.json();
+}
+
+export async function createDealTask(
+  dealId: string,
+  task: {
+    subject: string;
+    body?: string;
+    dueDate: string; // ISO string or YYYY-MM-DD
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  }
+): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const dueTimestamp = new Date(task.dueDate).getTime().toString();
+
+  const payload = {
+    properties: {
+      hs_task_subject: task.subject,
+      hs_task_body: task.body || '',
+      hs_timestamp: dueTimestamp,
+      hs_task_status: 'NOT_STARTED',
+      hs_task_priority: task.priority || 'HIGH',
+      hs_task_type: 'TODO',
+      hubspot_owner_id: OWNER_ID,
+    },
+    associations: [
+      {
+        to: { id: dealId },
+        types: [
+          {
+            associationCategory: 'HUBSPOT_DEFINED',
+            associationTypeId: 216, // Task to Deal association
+          },
+        ],
+      },
+    ],
+  };
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to create task in HubSpot: ${errorText}`);
+  }
+
+  return response.json();
+}
+
+export async function updateDealTask(
+  taskId: string,
+  status: 'COMPLETED' | 'NOT_STARTED'
+): Promise<any> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      properties: {
+        hs_task_status: status,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update task: ${errorText}`);
   }
 
   return response.json();

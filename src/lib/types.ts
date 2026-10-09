@@ -1,3 +1,29 @@
+export interface DealContact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle?: string;
+  phone?: string;
+}
+
+export interface DealNote {
+  id: string;
+  body: string;
+  createdAt: string;
+  timestamp: string;
+}
+
+export interface DealTask {
+  id: string;
+  subject: string;
+  body: string;
+  status: 'NOT_STARTED' | 'COMPLETED' | 'IN_PROGRESS';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  dueDate: string | null;
+  createdAt: string;
+}
+
 export interface Deal {
   id: string;
   name: string;
@@ -9,17 +35,13 @@ export interface Deal {
   lastModifiedDate: string;
   lastContactedDate: string | null;
   daysSinceContact: number | null;
-  health: 'urgent' | 'warning' | 'healthy' | 'neutral';
+  health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed';
   healthReason: string;
   ownerId: string | null;
   hubspotUrl: string;
-  associatedContacts?: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    jobTitle?: string;
-  }>;
+  nextTaskDate?: string | null;
+  nextTaskSubject?: string | null;
+  associatedContacts?: DealContact[];
 }
 
 export interface PipelineStage {

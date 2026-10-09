@@ -17,6 +17,7 @@ import {
 interface DealsTableProps {
   deals: Deal[];
   activeFilter: string;
+  onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
 }
@@ -24,6 +25,7 @@ interface DealsTableProps {
 export function DealsTable({
   deals,
   activeFilter,
+  onSelectDeal,
   onSelectDealForAnalysis,
   onDraftFollowUp,
 }: DealsTableProps) {
@@ -145,12 +147,14 @@ export function DealsTable({
                 return (
                   <tr
                     key={deal.id}
-                    className="hover:bg-slate-800/40 transition group"
+                    onClick={() => onSelectDeal(deal)}
+                    className="hover:bg-slate-800/40 transition group cursor-pointer"
                   >
                     {/* Deal Name */}
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-white group-hover:text-blue-400 transition">
-                        {deal.name}
+                      <div className="font-semibold text-white group-hover:text-blue-400 transition flex items-center space-x-1.5">
+                        <span>{deal.name}</span>
+                        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-70 transition text-slate-400" />
                       </div>
                       <div className="text-[11px] text-slate-500">ID: {deal.id}</div>
                     </td>

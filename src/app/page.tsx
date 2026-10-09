@@ -7,6 +7,7 @@ import { RadarView } from '@/components/RadarView';
 import { DealsTable } from '@/components/DealsTable';
 import { TranscriptIntelligenceModal } from '@/components/TranscriptIntelligenceModal';
 import { FollowUpModal } from '@/components/FollowUpModal';
+import { DealDrawer } from '@/components/DealDrawer';
 import { Deal } from '@/lib/types';
 import { Flame, Layers, AlertCircle, RefreshCw, Sparkles, Building2 } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [isTranscriptModalOpen, setIsTranscriptModalOpen] = useState(false);
   const [selectedDealForAnalysis, setSelectedDealForAnalysis] = useState<Deal | null>(null);
   const [dealForFollowUp, setDealForFollowUp] = useState<Deal | null>(null);
+  const [selectedDealForDrawer, setSelectedDealForDrawer] = useState<Deal | null>(null);
 
   const fetchDeals = async () => {
     try {
@@ -178,6 +180,7 @@ export default function DashboardPage() {
             {activeTab === 'radar' ? (
               <RadarView
                 deals={deals}
+                onSelectDeal={(deal) => setSelectedDealForDrawer(deal)}
                 onSelectDealForAnalysis={(deal) => handleOpenAnalysis(deal)}
                 onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
               />
@@ -185,6 +188,7 @@ export default function DashboardPage() {
               <DealsTable
                 deals={deals}
                 activeFilter={activeFilter}
+                onSelectDeal={(deal) => setSelectedDealForDrawer(deal)}
                 onSelectDealForAnalysis={(deal) => handleOpenAnalysis(deal)}
                 onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
               />
@@ -192,6 +196,15 @@ export default function DashboardPage() {
           </>
         )}
       </main>
+
+      {/* Deal Details Drawer (Notes, Tasks, Contacts) */}
+      <DealDrawer
+        deal={selectedDealForDrawer}
+        onClose={() => setSelectedDealForDrawer(null)}
+        onOpenAnalysis={(deal) => handleOpenAnalysis(deal)}
+        onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
+        onRefreshDeals={() => fetchDeals()}
+      />
 
       {/* Transcript Intelligence Modal */}
       <TranscriptIntelligenceModal

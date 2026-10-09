@@ -16,11 +16,12 @@ import {
 
 interface RadarViewProps {
   deals: Deal[];
+  onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
 }
 
-export function RadarView({ deals, onSelectDealForAnalysis, onDraftFollowUp }: RadarViewProps) {
+export function RadarView({ deals, onSelectDeal, onSelectDealForAnalysis, onDraftFollowUp }: RadarViewProps) {
   // Focus on deals needing attention (urgent or warning)
   const attentionDeals = deals.filter((d) => d.health === 'urgent' || d.health === 'warning');
 
@@ -70,9 +71,13 @@ export function RadarView({ deals, onSelectDealForAnalysis, onDraftFollowUp }: R
             >
               {/* Header: Deal Name & Amount */}
               <div className="flex items-start justify-between gap-3 mb-2">
-                <div>
-                  <h3 className="font-bold text-base text-white group-hover:text-blue-400 transition">
-                    {deal.name}
+                <div 
+                  onClick={() => onSelectDeal(deal)}
+                  className="cursor-pointer"
+                >
+                  <h3 className="font-bold text-base text-white group-hover:text-blue-400 transition flex items-center space-x-1.5">
+                    <span>{deal.name}</span>
+                    <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition text-blue-400" />
                   </h3>
                   <div className="flex items-center space-x-2 mt-1">
                     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
