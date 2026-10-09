@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Deal, DealContact, DealNote, DealTask } from '@/lib/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Deal, DealContact, DealNote, DealTask, DealEmail } from '@/lib/types';
 import { 
   X, 
   ExternalLink, 
@@ -18,7 +18,8 @@ import {
   Send, 
   AlertCircle,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Inbox
 } from 'lucide-react';
 
 interface DealDrawerProps {
@@ -41,6 +42,7 @@ export function DealDrawer({
   const [notes, setNotes] = useState<DealNote[]>([]);
   const [tasks, setTasks] = useState<DealTask[]>([]);
   const [contacts, setContacts] = useState<DealContact[]>([]);
+  const [emails, setEmails] = useState<DealEmail[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // New Note Form
@@ -72,12 +74,35 @@ export function DealDrawer({
       setNotes(data.notes || []);
       setTasks(data.tasks || []);
       setContacts(data.contacts || []);
+      setEmails(data.emails || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load deal details');
     } finally {
       setLoading(false);
     }
   };
+
+  const timelineItems = useMemo(() => {
+    const combined = [
+      ...notes.map((n) => ({
+        id: n.id,
+        type: 'note' as const,
+        body: n.body,
+        timestamp: n.timestamp,
+      })),
+      ...emails.map((e) => ({
+        id: e.id,
+        type: 'email' as const,
+        subject: e.subject,
+        body: e.body || '',
+        direction: e.direction,
+        timestamp: e.timestamp,
+      })),
+    ];
+    return combined.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [notes, emails]);
 
   if (!deal) return null;
 
@@ -236,7 +261,7 @@ export function DealDrawer({
             }`}
           >
             <FileText className="h-3.5 w-3.5" />
-            <span>Notes & Activity ({notes.length})</span>
+            <span>Activity Timeline ({timelineItems.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('tasks')}
@@ -274,12 +299,12 @@ export function DealDrawer({
             </div>
           ) : (
             <>
-              {/* NOTES TAB */}
+              {/* TIMELINE TAB (NOTES & EMAILS) */}
               {activeTab === 'notes' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Timeline Notes ({notes.length})
+                      Timeline ({timelineItems.length}) • Notes & Emails
                     </span>
                     <button
                       onClick={() => setShowAddNote(!showAddNote)}
@@ -313,15 +338,15 @@ export function DealDrawer({
                     </form>
                   )}
 
-                  {/* Notes List */}
-                  {notes.length === 0 ? (
+                  {/* Timeline Items List */}
+                  {timelineItems.length === 0 ? (
                     <div className="text-center py-8 text-slate-500 text-xs">
-                      No notes recorded on this deal yet.
+                      No activity recorded on this deal yet.
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {notes.map((note) => {
-                        const dateFormatted = new Date(note.timestamp).toLocaleDateString('en-GB', {
+                      {timelineItems.map((item) => {
+                        const dateFormatted = new Date(item.timestamp).toLocaleDateString('en-GB', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
@@ -329,18 +354,40 @@ export function DealDrawer({
                           minute: '2-digit',
                         });
 
+                        const isEmail = item.type === 'email';
+
                         return (
                           <div
-                            key={note.id}
-                            className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-xs space-y-2"
+                            key={item.id}
+                            className={`p-4 rounded-xl border text-xs space-y-2 ${
+                              isEmail
+                                ? 'bg-blue-950/20 border-blue-900/40'
+                                : 'bg-slate-900/70 border-slate-800'
+                            }`}
                           >
                             <div className="flex items-center justify-between text-[11px] text-slate-400">
-                              <span className="font-semibold text-slate-300">Note</span>
+                              <span
+                                className={`font-semibold flex items-center space-x-1.5 ${
+                                  isEmail ? 'text-blue-400' : 'text-slate-300'
+                                }`}
+                              >
+                                {isEmail ? (
+                                  <>
+                                    <Mail className="h-3.5 w-3.5" />
+                                    <span>Email: {item.subject || 'Logged Email'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>Note</span>
+                                  </>
+                                )}
+                              </span>
                               <span>{dateFormatted}</span>
                             </div>
                             <div
                               className="text-slate-200 leading-relaxed break-words whitespace-pre-wrap font-sans"
-                              dangerouslySetInnerHTML={{ __html: note.body }}
+                              dangerouslySetInnerHTML={{ __html: item.body }}
                             />
                           </div>
                         );

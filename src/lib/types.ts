@@ -24,6 +24,14 @@ export interface DealTask {
   createdAt: string;
 }
 
+export interface DealEmail {
+  id: string;
+  subject: string;
+  body?: string;
+  direction?: string;
+  timestamp: string;
+}
+
 export interface Deal {
   id: string;
   name: string;

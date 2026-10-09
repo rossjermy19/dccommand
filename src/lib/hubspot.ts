@@ -1,4 +1,4 @@
-import { Deal, DealContact, DealNote, DealTask, PipelineStage } from './types';
+import { Deal, DealContact, DealNote, DealTask, DealEmail, PipelineStage } from './types';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -202,7 +202,16 @@ export async function getOpenDeals(): Promise<Deal[]> {
     openTasks.sort((a, b) => a.due - b.due);
 
     const futureTask = openTasks.find((t) => t.due >= now);
-    const overdueOrTodayTask = openTasks.find((t) => t.due < now && t.due > 0);
+
+    // An overdue task is ONLY active if it has NOT been fulfilled by a subsequent contact!
+    // If the contact occurred AFTER the task was due, or if touched TODAY (daysSinceContact === 0),
+    // the task has been fulfilled by the communication!
+    const unfulfilledOverdueTask = openTasks.find((t) => {
+      if (t.due >= now) return false;
+      if (daysSinceContact === 0) return false; // touched today!
+      if (latestTouchTime !== null && latestTouchTime > t.due) return false; // touched after task due date!
+      return true;
+    });
 
     let nextTaskDate: string | null = null;
     let nextTaskSubject: string | null = null;
@@ -219,8 +228,11 @@ export async function getOpenDeals(): Promise<Deal[]> {
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
-    // 1. If there is a scheduled future task, it is PLANNED / SNOOZED (NOT a ghosting risk!)
-    if (futureTask) {
+    // 1. If contacted today, celebrate it! (e.g. email sent today)
+    if (daysSinceContact === 0) {
+      health = 'healthy';
+      healthReason = 'Contacted today via email/note';
+    } else if (futureTask) {
       health = 'snoozed';
       const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -228,9 +240,9 @@ export async function getOpenDeals(): Promise<Deal[]> {
         year: 'numeric',
       });
       healthReason = `Planned follow-up: ${futureTask.subject} (${formattedDue})`;
-    } else if (overdueOrTodayTask) {
+    } else if (unfulfilledOverdueTask) {
       health = 'warning';
-      healthReason = `Task due today / overdue: ${overdueOrTodayTask.subject}`;
+      healthReason = `Task due: ${unfulfilledOverdueTask.subject}`;
     } else if (daysSinceContact !== null && daysSinceContact >= 7) {
       health = 'urgent';
       healthReason = `Ghosting risk: No touchpoint in ${daysSinceContact}d & no task scheduled`;
@@ -240,16 +252,12 @@ export async function getOpenDeals(): Promise<Deal[]> {
     } else if (props.dealstage === 'presentationscheduled' || props.dealstage === '1209215206') {
       // Meeting was held or booked recently (0-3 days)
       health = 'warning';
-      healthReason = daysSinceContact === 0 
-        ? 'Meeting held today — next step / proposal due'
-        : daysSinceContact === 1
+      healthReason = daysSinceContact === 1
         ? 'Meeting held yesterday — next step / proposal due'
         : `Meeting held ${daysSinceContact}d ago — next step due`;
     } else {
       health = 'healthy';
-      healthReason = daysSinceContact === 0
-        ? 'Touched today'
-        : daysSinceContact === 1
+      healthReason = daysSinceContact === 1
         ? 'Touched yesterday'
         : `Touched ${daysSinceContact}d ago`;
     }
@@ -279,17 +287,18 @@ export async function getOpenDeals(): Promise<Deal[]> {
 }
 
 /**
- * Fetch detailed view for a single deal (Notes, Tasks, Contacts)
+ * Fetch detailed view for a single deal (Notes, Tasks, Contacts, Emails)
  */
 export async function getDealDetails(dealId: string): Promise<{
   notes: DealNote[];
   tasks: DealTask[];
   contacts: DealContact[];
+  emails: DealEmail[];
 }> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
   // Fetch associations concurrently
-  const [notesAssocRes, tasksAssocRes, contactsAssocRes] = await Promise.all([
+  const [notesAssocRes, tasksAssocRes, contactsAssocRes, emailsAssocRes] = await Promise.all([
     fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
@@ -299,20 +308,25 @@ export async function getDealDetails(dealId: string): Promise<{
     fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/contacts`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/emails`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    }),
   ]);
 
-  const [notesAssoc, tasksAssoc, contactsAssoc] = await Promise.all([
+  const [notesAssoc, tasksAssoc, contactsAssoc, emailsAssoc] = await Promise.all([
     notesAssocRes.ok ? notesAssocRes.json() : { results: [] },
     tasksAssocRes.ok ? tasksAssocRes.json() : { results: [] },
     contactsAssocRes.ok ? contactsAssocRes.json() : { results: [] },
+    emailsAssocRes.ok ? emailsAssocRes.json() : { results: [] },
   ]);
 
   const noteIds = (notesAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
   const taskIds = (tasksAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
   const contactIds = (contactsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+  const emailIds = (emailsAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
 
   // Fetch batch details
-  const [notesBatchRes, tasksBatchRes, contactsBatchRes] = await Promise.all([
+  const [notesBatchRes, tasksBatchRes, contactsBatchRes, emailsBatchRes] = await Promise.all([
     noteIds.length > 0
       ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/batch/read`, {
           method: 'POST',
@@ -350,12 +364,23 @@ export async function getDealDetails(dealId: string): Promise<{
           }),
         })
       : null,
+    emailIds.length > 0
+      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: emailIds,
+            properties: ['hs_email_subject', 'hs_email_text', 'hs_timestamp', 'hs_email_direction'],
+          }),
+        })
+      : null,
   ]);
 
-  const [notesBatch, tasksBatch, contactsBatch] = await Promise.all([
+  const [notesBatch, tasksBatch, contactsBatch, emailsBatch] = await Promise.all([
     notesBatchRes?.ok ? notesBatchRes.json() : { results: [] },
     tasksBatchRes?.ok ? tasksBatchRes.json() : { results: [] },
     contactsBatchRes?.ok ? contactsBatchRes.json() : { results: [] },
+    emailsBatchRes?.ok ? emailsBatchRes.json() : { results: [] },
   ]);
 
   const notes: DealNote[] = (notesBatch.results || [])
@@ -395,7 +420,20 @@ export async function getDealDetails(dealId: string): Promise<{
     phone: item.properties?.phone || '',
   }));
 
-  return { notes, tasks, contacts };
+  const emails: DealEmail[] = (emailsBatch.results || [])
+    .map((item: any) => ({
+      id: item.id,
+      subject: item.properties?.hs_email_subject || 'Email',
+      body: item.properties?.hs_email_text || '',
+      direction: item.properties?.hs_email_direction || 'EMAIL',
+      timestamp: item.properties?.hs_timestamp || item.createdAt,
+    }))
+    .sort(
+      (a: DealEmail, b: DealEmail) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+  return { notes, tasks, contacts, emails };
 }
 
 export async function addDealNote(dealId: string, noteBody: string): Promise<any> {
