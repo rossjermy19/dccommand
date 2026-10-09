@@ -170,7 +170,13 @@ export function DealsTable({
                     {/* Last Touch */}
                     <td className="py-3.5 px-4 text-xs text-slate-400">
                       {deal.daysSinceContact !== null ? (
-                        <span>{deal.daysSinceContact}d ago</span>
+                        <span>
+                          {deal.daysSinceContact === 0
+                            ? 'Today'
+                            : deal.daysSinceContact === 1
+                            ? 'Yesterday'
+                            : `${deal.daysSinceContact}d ago`}
+                        </span>
                       ) : (
                         <span className="text-slate-500">None logged</span>
                       )}

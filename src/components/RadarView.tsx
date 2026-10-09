@@ -111,7 +111,11 @@ export function RadarView({ deals, onSelectDealForAnalysis, onDraftFollowUp }: R
               <div className="pt-2 flex items-center justify-between border-t border-slate-800/80">
                 <span className="text-[11px] text-slate-400">
                   {deal.daysSinceContact !== null
-                    ? `${deal.daysSinceContact}d since last touch`
+                    ? deal.daysSinceContact === 0
+                      ? 'Touched today'
+                      : deal.daysSinceContact === 1
+                      ? 'Touched yesterday'
+                      : `${deal.daysSinceContact}d since last touch`
                     : 'No touchpoint date'}
                 </span>
 

@@ -81,6 +81,9 @@ export async function getOpenDeals(): Promise<Deal[]> {
       'closedate',
       'hs_lastmodifieddate',
       'notes_last_contacted',
+      'notes_last_updated',
+      'hs_latest_meeting_activity',
+      'hs_sales_email_last_replied',
       'hubspot_owner_id',
     ],
     limit: 100,
@@ -112,12 +115,26 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
   return (data.results || []).map((item: any): Deal => {
     const props = item.properties || {};
-    const lastContactStr = props.notes_last_contacted || props.hs_lastmodifieddate;
+
+    // Collect all touchpoint and note timestamps
+    const timestamps = [
+      props.notes_last_updated ? new Date(props.notes_last_updated).getTime() : 0,
+      props.notes_last_contacted ? new Date(props.notes_last_contacted).getTime() : 0,
+      props.hs_latest_meeting_activity ? new Date(props.hs_latest_meeting_activity).getTime() : 0,
+      props.hs_sales_email_last_replied ? new Date(props.hs_sales_email_last_replied).getTime() : 0,
+    ].filter((t) => !isNaN(t) && t > 0);
+
+    // Fall back to hs_lastmodifieddate if no explicit note/activity date is set
+    if (timestamps.length === 0 && props.hs_lastmodifieddate) {
+      const mod = new Date(props.hs_lastmodifieddate).getTime();
+      if (!isNaN(mod) && mod > 0) timestamps.push(mod);
+    }
+
+    const latestTouchTime = timestamps.length > 0 ? Math.max(...timestamps) : null;
     let daysSinceContact: number | null = null;
     
-    if (lastContactStr) {
-      const contactTime = new Date(lastContactStr).getTime();
-      daysSinceContact = Math.max(0, Math.floor((now - contactTime) / (1000 * 60 * 60 * 24)));
+    if (latestTouchTime !== null) {
+      daysSinceContact = Math.max(0, Math.floor((now - latestTouchTime) / (1000 * 60 * 60 * 24)));
     }
 
     // Health logic
@@ -126,13 +143,25 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
     if (daysSinceContact !== null && daysSinceContact >= 7) {
       health = 'urgent';
-      healthReason = `Ghosting risk: No contact recorded in ${daysSinceContact} days`;
+      healthReason = `Ghosting risk: No touchpoint in ${daysSinceContact} days`;
     } else if (daysSinceContact !== null && daysSinceContact >= 4) {
       health = 'warning';
       healthReason = `Follow-up recommended: ${daysSinceContact} days since last touch`;
     } else if (props.dealstage === 'presentationscheduled' || props.dealstage === '1209215206') {
+      // Meeting was held or booked recently (0-3 days)
       health = 'warning';
-      healthReason = 'Post-meeting next step / follow-up action due';
+      healthReason = daysSinceContact === 0 
+        ? 'Meeting held today — next step / proposal due'
+        : daysSinceContact === 1
+        ? 'Meeting held yesterday — next step / proposal due'
+        : `Meeting held ${daysSinceContact}d ago — next step due`;
+    } else {
+      health = 'healthy';
+      healthReason = daysSinceContact === 0
+        ? 'Touched today'
+        : daysSinceContact === 1
+        ? 'Touched yesterday'
+        : `Touched ${daysSinceContact}d ago`;
     }
 
     const stageId = props.dealstage || '';
