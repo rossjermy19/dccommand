@@ -1,5 +1,6 @@
 import { Deal, DealContact, DealNote, DealTask, DealEmail, PipelineStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
+import { getAlignedStoriesMap } from './aligned';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -88,6 +89,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
       'hubspot_owner_id',
       'source',
       'sub_source',
+      'createdate',
     ],
     limit: 100,
     sorts: [
@@ -176,14 +178,20 @@ export async function getOpenDeals(): Promise<Deal[]> {
   }
 
   const customTagsMap = getCustomTagsMap();
+  const alignedStoriesMap = getAlignedStoriesMap();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
 
     const customTags = customTagsMap[item.id] || [];
+    const alignedStoryRecord = alignedStoriesMap[item.id];
     const rawSubSource = props.sub_source || null;
     const rawSource = props.source || null;
     const isLibby = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.includes('Libby');
+
+    const createTime = props.createdate ? new Date(props.createdate).getTime() : 0;
+    const daysOld = createTime > 0 ? (now - createTime) / (1000 * 60 * 60 * 24) : 999;
+    const isNewDeal = daysOld <= 14;
 
     const tagsSet = new Set<string>();
     if (isLibby) tagsSet.add('Libby');
@@ -302,6 +310,10 @@ export async function getOpenDeals(): Promise<Deal[]> {
       source: rawSource,
       subSource: rawSubSource,
       tags,
+      createdDate: props.createdate || null,
+      isNewDeal,
+      alignedStory: alignedStoryRecord?.story || null,
+      alignedStoryReady: !!alignedStoryRecord,
     };
   });
 }

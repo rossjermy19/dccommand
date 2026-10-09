@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { KpiHeader } from '@/components/KpiHeader';
+import { DailyMissionControl } from '@/components/DailyMissionControl';
 import { StageBoard } from '@/components/StageBoard';
 import { RadarView } from '@/components/RadarView';
 import { DealsTable } from '@/components/DealsTable';
 import { TranscriptIntelligenceModal } from '@/components/TranscriptIntelligenceModal';
+import { AlignedStoryModal } from '@/components/AlignedStoryModal';
 import { FollowUpModal } from '@/components/FollowUpModal';
 import { DealDrawer } from '@/components/DealDrawer';
 import { Deal } from '@/lib/types';
@@ -21,7 +23,9 @@ import {
   Tag, 
   X, 
   Sparkles,
-  Filter
+  Filter,
+  Zap,
+  Target
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -38,8 +42,8 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // View Mode: 'stages' | 'radar' | 'table'
-  const [viewMode, setViewMode] = useState<'stages' | 'radar' | 'table'>('stages');
+  // View Mode: 'mission' (Default Clear-Desk) | 'stages' | 'radar' | 'table'
+  const [viewMode, setViewMode] = useState<'mission' | 'stages' | 'radar' | 'table'>('mission');
 
   // Filters
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -51,6 +55,10 @@ export default function DashboardPage() {
   const [selectedDealForAnalysis, setSelectedDealForAnalysis] = useState<Deal | null>(null);
   const [dealForFollowUp, setDealForFollowUp] = useState<Deal | null>(null);
   const [selectedDealForDrawer, setSelectedDealForDrawer] = useState<Deal | null>(null);
+
+  // Aligned Story Modal state
+  const [isAlignedModalOpen, setIsAlignedModalOpen] = useState(false);
+  const [selectedDealForAligned, setSelectedDealForAligned] = useState<Deal | null>(null);
 
   const fetchDeals = async () => {
     try {
@@ -92,6 +100,11 @@ export default function DashboardPage() {
     setIsTranscriptModalOpen(true);
   };
 
+  const handleOpenAlignedModal = (deal: Deal) => {
+    setSelectedDealForAligned(deal);
+    setIsAlignedModalOpen(true);
+  };
+
   const handleLogNote = async (dealId: string, noteBody: string) => {
     const res = await fetch('/api/hubspot/note', {
       method: 'POST',
@@ -110,6 +123,11 @@ export default function DashboardPage() {
         d.tags?.some((t) => /libby|liberty/i.test(t)) ||
         /libby|liberty/i.test(d.subSource || '')
     ).length;
+  }, [deals]);
+
+  // Compute pending missions count for the badge
+  const pendingMissionsCount = useMemo(() => {
+    return deals.filter((d) => d.health === 'urgent' || d.health === 'warning').length;
   }, [deals]);
 
   return (
@@ -154,13 +172,36 @@ export default function DashboardPage() {
             <KpiHeader
               stats={stats}
               filter={activeFilter}
-              onSelectFilter={(f) => setActiveFilter(f)}
+              onSelectFilter={(f) => {
+                setActiveFilter(f);
+                // If on Mission Control and user clicks a KPI tile, switch to pipeline view to explore
+                if (viewMode === 'mission' && f !== 'all') {
+                  setViewMode('stages');
+                }
+              }}
             />
 
-            {/* View Switcher & Toolbar */}
+            {/* Navigation Bar & Mode Switcher */}
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              {/* View Switcher Tabs */}
-              <div className="flex items-center space-x-2">
+              {/* Primary Views Tabs */}
+              <div className="flex items-center space-x-2 flex-wrap">
+                <button
+                  onClick={() => setViewMode('mission')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                    viewMode === 'mission'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 ring-1 ring-blue-400'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <Target className="h-4 w-4 text-amber-400" />
+                  <span>Daily Clear-Desk Command</span>
+                  {pendingMissionsCount > 0 && (
+                    <span className="text-[10px] bg-rose-500 text-white font-extrabold px-1.5 py-0.2 rounded-full ml-1">
+                      {pendingMissionsCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   onClick={() => setViewMode('stages')}
                   className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
@@ -170,7 +211,10 @@ export default function DashboardPage() {
                   }`}
                 >
                   <Kanban className="h-3.5 w-3.5" />
-                  <span>Stage Board</span>
+                  <span>Pipeline Board</span>
+                  <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded-full">
+                    {deals.length}
+                  </span>
                 </button>
 
                 <button
@@ -183,9 +227,6 @@ export default function DashboardPage() {
                 >
                   <Flame className="h-3.5 w-3.5 text-amber-400" />
                   <span>Action Radar</span>
-                  <span className="text-[10px] bg-blue-900/60 text-blue-200 px-1.5 py-0.5 rounded-full ml-0.5">
-                    {stats.urgentCount + stats.warningCount}
-                  </span>
                 </button>
 
                 <button
@@ -197,7 +238,7 @@ export default function DashboardPage() {
                   }`}
                 >
                   <Table className="h-3.5 w-3.5" />
-                  <span>Pipeline Table</span>
+                  <span>All Deals Table</span>
                 </button>
               </div>
 
@@ -276,7 +317,20 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Active Views */}
+            {/* View 1: Gamified Daily Mission Control (Default) */}
+            {viewMode === 'mission' && (
+              <DailyMissionControl
+                deals={deals}
+                onSelectDeal={(deal) => setSelectedDealForDrawer(deal)}
+                onOpenAnalysis={(deal) => handleOpenAnalysis(deal)}
+                onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
+                onOpenAlignedModal={handleOpenAlignedModal}
+                onSwitchToPipelineBoard={() => setViewMode('stages')}
+                onRefreshDeals={fetchDeals}
+              />
+            )}
+
+            {/* View 2: Full-Width Pipeline Stages Board */}
             {viewMode === 'stages' && (
               <StageBoard
                 deals={deals}
@@ -286,10 +340,12 @@ export default function DashboardPage() {
                 onSelectDeal={(deal) => setSelectedDealForDrawer(deal)}
                 onSelectDealForAnalysis={(deal) => handleOpenAnalysis(deal)}
                 onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
+                onOpenAlignedModal={handleOpenAlignedModal}
                 onTagUpdated={() => fetchDeals()}
               />
             )}
 
+            {/* View 3: Urgency Action Radar */}
             {viewMode === 'radar' && (
               <RadarView
                 deals={deals}
@@ -299,10 +355,12 @@ export default function DashboardPage() {
                 onSelectDeal={(deal) => setSelectedDealForDrawer(deal)}
                 onSelectDealForAnalysis={(deal) => handleOpenAnalysis(deal)}
                 onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
+                onOpenAlignedModal={handleOpenAlignedModal}
                 onTagUpdated={() => fetchDeals()}
               />
             )}
 
+            {/* View 4: High-Density Table */}
             {viewMode === 'table' && (
               <DealsTable
                 deals={deals}
@@ -324,10 +382,11 @@ export default function DashboardPage() {
         onClose={() => setSelectedDealForDrawer(null)}
         onOpenAnalysis={(deal) => handleOpenAnalysis(deal)}
         onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
+        onOpenAlignedModal={handleOpenAlignedModal}
         onRefreshDeals={() => fetchDeals()}
       />
 
-      {/* Transcript Intelligence Modal */}
+      {/* Transcript Intelligence Modal (Fireflies AI Deep-Dive) */}
       <TranscriptIntelligenceModal
         isOpen={isTranscriptModalOpen}
         onClose={() => {
@@ -336,6 +395,17 @@ export default function DashboardPage() {
         }}
         deals={deals}
         preselectedDeal={selectedDealForAnalysis}
+      />
+
+      {/* Aligned Deal Room Story Generator Modal */}
+      <AlignedStoryModal
+        isOpen={isAlignedModalOpen}
+        onClose={() => {
+          setIsAlignedModalOpen(false);
+          setSelectedDealForAligned(null);
+        }}
+        deal={selectedDealForAligned}
+        onStorySaved={() => fetchDeals()}
       />
 
       {/* Follow-up Email Drafter Modal */}

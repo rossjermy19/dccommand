@@ -53,6 +53,10 @@ export interface Deal {
   source?: string | null;
   subSource?: string | null;
   tags?: string[];
+  createdDate?: string | null;
+  isNewDeal?: boolean;
+  alignedStory?: string | null;
+  alignedStoryReady?: boolean;
 }
 
 export interface PipelineStage {

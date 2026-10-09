@@ -13,6 +13,7 @@ interface StageBoardProps {
   onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
+  onOpenAlignedModal?: (deal: Deal) => void;
   onTagUpdated?: () => void;
 }
 
@@ -51,6 +52,7 @@ export function StageBoard({
   onSelectDeal,
   onSelectDealForAnalysis,
   onDraftFollowUp,
+  onOpenAlignedModal,
   onTagUpdated,
 }: StageBoardProps) {
   // 1. Filter deals by KPI health status, Tag, and Search text
@@ -182,6 +184,7 @@ export function StageBoard({
                       onSelectDeal={onSelectDeal}
                       onSelectDealForAnalysis={onSelectDealForAnalysis}
                       onDraftFollowUp={onDraftFollowUp}
+                      onOpenAlignedModal={onOpenAlignedModal}
                       onTagUpdated={onTagUpdated}
                     />
                   ))

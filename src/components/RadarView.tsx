@@ -20,6 +20,7 @@ interface RadarViewProps {
   onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
+  onOpenAlignedModal?: (deal: Deal) => void;
   onTagUpdated?: () => void;
 }
 
@@ -31,6 +32,7 @@ export function RadarView({
   onSelectDeal, 
   onSelectDealForAnalysis, 
   onDraftFollowUp,
+  onOpenAlignedModal,
   onTagUpdated 
 }: RadarViewProps) {
   // Apply Tag and Search filter
@@ -114,6 +116,7 @@ export function RadarView({
                   onSelectDeal={onSelectDeal}
                   onSelectDealForAnalysis={onSelectDealForAnalysis}
                   onDraftFollowUp={onDraftFollowUp}
+                  onOpenAlignedModal={onOpenAlignedModal}
                   onTagUpdated={onTagUpdated}
                 />
               ))}
@@ -146,6 +149,7 @@ export function RadarView({
                   onSelectDeal={onSelectDeal}
                   onSelectDealForAnalysis={onSelectDealForAnalysis}
                   onDraftFollowUp={onDraftFollowUp}
+                  onOpenAlignedModal={onOpenAlignedModal}
                   onTagUpdated={onTagUpdated}
                 />
               ))}
@@ -178,6 +182,7 @@ export function RadarView({
                   onSelectDeal={onSelectDeal}
                   onSelectDealForAnalysis={onSelectDealForAnalysis}
                   onDraftFollowUp={onDraftFollowUp}
+                  onOpenAlignedModal={onOpenAlignedModal}
                   onTagUpdated={onTagUpdated}
                 />
               ))}
@@ -210,6 +215,7 @@ export function RadarView({
                   onSelectDeal={onSelectDeal}
                   onSelectDealForAnalysis={onSelectDealForAnalysis}
                   onDraftFollowUp={onDraftFollowUp}
+                  onOpenAlignedModal={onOpenAlignedModal}
                   onTagUpdated={onTagUpdated}
                 />
               ))}

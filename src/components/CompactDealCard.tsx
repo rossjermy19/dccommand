@@ -20,6 +20,7 @@ interface CompactDealCardProps {
   onSelectDeal: (deal: Deal) => void;
   onSelectDealForAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
+  onOpenAlignedModal?: (deal: Deal) => void;
   onTagUpdated?: () => void;
 }
 
@@ -28,6 +29,7 @@ export function CompactDealCard({
   onSelectDeal,
   onSelectDealForAnalysis,
   onDraftFollowUp,
+  onOpenAlignedModal,
   onTagUpdated,
 }: CompactDealCardProps) {
   const formattedAmount = deal.amount
@@ -136,11 +138,23 @@ export function CompactDealCard({
 
       {/* Action Toolbar on bottom */}
       <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-        <span className="text-[10px] text-slate-500 truncate max-w-[130px]">
+        <span className="text-[10px] text-slate-500 truncate max-w-[120px]">
           {deal.stageLabel}
         </span>
 
         <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition">
+          {onOpenAlignedModal && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenAlignedModal(deal);
+              }}
+              title="Generate / View Aligned Deal Room Story"
+              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-purple-400 transition"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

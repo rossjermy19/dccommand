@@ -28,6 +28,7 @@ interface DealDrawerProps {
   onClose: () => void;
   onOpenAnalysis: (deal: Deal) => void;
   onDraftFollowUp: (deal: Deal) => void;
+  onOpenAlignedModal?: (deal: Deal) => void;
   onRefreshDeals: () => void;
 }
 
@@ -36,6 +37,7 @@ export function DealDrawer({
   onClose,
   onOpenAnalysis,
   onDraftFollowUp,
+  onOpenAlignedModal,
   onRefreshDeals,
 }: DealDrawerProps) {
   const [activeTab, setActiveTab] = useState<'notes' | 'tasks' | 'contacts'>('notes');
@@ -254,6 +256,15 @@ export function DealDrawer({
               <Mail className="h-3.5 w-3.5" />
               <span>Draft Follow-up</span>
             </button>
+            {onOpenAlignedModal && (
+              <button
+                onClick={() => onOpenAlignedModal(deal)}
+                className="flex items-center space-x-1.5 text-xs font-medium bg-purple-900/60 hover:bg-purple-800 text-purple-200 px-3 py-1.5 rounded-lg border border-purple-500/40 transition"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-purple-300" />
+                <span>Aligned Deal Story</span>
+              </button>
+            )}
           </div>
         </div>
 
