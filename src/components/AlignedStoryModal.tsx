@@ -216,7 +216,7 @@ export function AlignedStoryModal({
               {transcriptSource === 'fireflies' ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-                    <span>Recent Sales Calls from Fireflies</span>
+                    <span className="font-semibold text-slate-700">My Recent Sales Calls (Ross Jermy)</span>
                     <button
                       onClick={fetchFirefliesCalls}
                       disabled={loadingFireflies}
@@ -229,7 +229,7 @@ export function AlignedStoryModal({
 
                   {loadingFireflies ? (
                     <div className="py-8 text-center text-xs text-slate-400 font-medium">
-                      Loading Fireflies transcripts...
+                      Loading your Fireflies transcripts...
                     </div>
                   ) : firefliesTranscripts.length === 0 ? (
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-center font-medium">

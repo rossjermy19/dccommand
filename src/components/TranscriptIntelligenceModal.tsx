@@ -277,7 +277,7 @@ export function TranscriptIntelligenceModal({
               {inputMode === 'fireflies' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Recent Fireflies Recordings</span>
+                    <span className="font-semibold text-slate-700">My Recordings (Ross Jermy)</span>
                     <button
                       onClick={fetchFirefliesCalls}
                       className="text-blue-600 hover:underline font-medium"
@@ -288,13 +288,13 @@ export function TranscriptIntelligenceModal({
 
                   {loadingFireflies ? (
                     <div className="py-12 text-center text-slate-500 text-xs">
-                      Fetching recent recordings from Fireflies.ai...
+                      Fetching your meetings from Fireflies.ai...
                     </div>
                   ) : firefliesCalls.length === 0 ? (
                     <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
                       <p className="text-xs text-slate-600">
                         {hasFirefliesKey
-                          ? 'No recent meetings found in your Fireflies account.'
+                          ? 'No recent meetings found for your account in Fireflies.'
                           : 'FIREFLIES_API_KEY is not yet detected in environment variables.'}
                       </p>
                       <button
