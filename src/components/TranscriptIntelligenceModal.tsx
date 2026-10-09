@@ -526,6 +526,7 @@ export function TranscriptIntelligenceModal({
                 </div>
               </div>
             </div>
+          )}
         </div>
       </div>
     </div>

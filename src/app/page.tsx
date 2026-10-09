@@ -125,7 +125,7 @@ export default function DashboardPage() {
       if (d.subSource) {
         set.add(d.subSource === 'Liberty Jai' ? 'Liberty J' : d.subSource);
       }
-      if (d.dealSource) set.add(d.dealSource);
+      if (d.source) set.add(d.source);
     });
     return Array.from(set).filter(Boolean).sort();
   }, [deals]);
