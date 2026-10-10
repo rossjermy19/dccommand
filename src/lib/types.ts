@@ -111,6 +111,10 @@ export interface TranscriptAnalysisResult {
 }
 
 export const PIPELINE_STAGES = [
+  { id: 'appointmentscheduled', label: 'New Lead' },
+  { id: '1638150379', label: 'Back Burning' },
+  { id: 'qualifiedtobuy', label: 'Contact Made' },
+  { id: '1352329431', label: 'No Response' },
   { id: '1209215206', label: 'Meeting Booked' },
   { id: 'presentationscheduled', label: 'Meeting Held' },
   { id: '1465977055', label: 'Upside' },
@@ -120,8 +124,5 @@ export const PIPELINE_STAGES = [
   { id: 'closedwon', label: 'Closed Won' },
   { id: 'closedlost', label: 'Closed Lost' },
   { id: '1352329432', label: 'No Response - After Meeting' },
-  { id: 'qualifiedtobuy', label: 'Qualified To Buy' },
   { id: '5536133318', label: 'Back Burner' },
-  { id: '5030008022', label: 'Evaluation / Follow-up' },
-  { id: '1638150379', label: 'Proposal / Active Review' },
 ];

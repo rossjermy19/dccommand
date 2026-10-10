@@ -77,6 +77,11 @@ export function DailyMissionControl({
     const list: MissionItem[] = [];
 
     deals.forEach((deal) => {
+      // Ignore Closed Won deals for daily missions
+      if (deal.stage === 'closedwon' || deal.stage === '5030008021' || deal.stageLabel.toLowerCase().includes('closed won')) {
+        return;
+      }
+
       // 1. 7-Day Inactivity Review (>=7 days without note/touch and no future task/meeting)
       if (deal.health === 'urgent') {
         list.push({

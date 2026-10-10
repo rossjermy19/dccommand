@@ -8,7 +8,11 @@ const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
 const OWNER_ID = process.env.HUBSPOT_OWNER_ID || '75550922';
 
 export const STAGE_LABELS: Record<string, string> = {
-  // Default sales pipeline
+  // Default Sales Pipeline
+  'appointmentscheduled': 'New Lead',
+  '1638150379': 'Back Burning',
+  'qualifiedtobuy': 'Contact Made',
+  '1352329431': 'No Response',
   '1209215206': 'Meeting Booked',
   'presentationscheduled': 'Meeting Held',
   '1465977055': 'Upside',
@@ -21,11 +25,24 @@ export const STAGE_LABELS: Record<string, string> = {
   '2594016461': 'Re-Engage Pipeline Helm',
   '3043628233': 'Re-Engage Pipeline Voila',
   '3043628234': 'Re-Engage Pipeline Neuro',
-  'qualifiedtobuy': 'Qualified To Buy',
+
+  // Voila & Neuro Pipeline
+  '5030008011': 'New Lead',
+  '5030008012': 'Back Burning',
+  '5030008013': 'Contact Made',
+  '5030008014': 'No Response',
+  '5030008015': 'Meeting Booked',
+  '5030008016': 'Meeting Held',
+  '5030008017': 'Upside',
+  '5030008018': 'Expected to close',
+  '5030008019': 'Committed',
+  '5030008020': 'Contract Sent',
+  '5030008021': 'Closed Won',
+  '5030008022': 'Closed Lost',
+  '5030008023': 'No Response - After Meeting',
+
   // Back Burning / Other
   '5536133318': 'Back Burner',
-  '5030008022': 'Evaluation / Follow-up',
-  '1638150379': 'Proposal / Active Review',
 };
 
 export async function fetchPipelineStages(): Promise<Record<string, string>> {
@@ -69,11 +86,6 @@ export async function getOpenDeals(): Promise<Deal[]> {
         propertyName: 'dealstage',
         operator: 'NEQ',
         value: 'closedlost',
-      },
-      {
-        propertyName: 'dealstage',
-        operator: 'NEQ',
-        value: 'closedwon',
       },
     ],
     properties: [
@@ -127,7 +139,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
   const rawDeals = allResults.filter((item: any) => {
     const stageId = (item.properties?.dealstage || '').toLowerCase();
     const stageLabel = (stageLabels[stageId] || STAGE_LABELS[stageId] || '').toLowerCase();
-    if (stageId === 'closedlost' || stageId.includes('lost') || stageLabel.includes('lost')) {
+    if (stageId === 'closedlost' || stageId === '5030008022' || stageId.includes('lost') || stageLabel.includes('lost')) {
       return false;
     }
     return true;
@@ -345,12 +357,20 @@ export async function getOpenDeals(): Promise<Deal[]> {
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
+    const stageIdLower = (props.dealstage || '').toLowerCase();
+    const stageLabelLower = (stageLabels[props.dealstage] || STAGE_LABELS[props.dealstage] || '').toLowerCase();
+    const isClosedWon = stageIdLower === 'closedwon' || stageIdLower === '5030008021' || stageLabelLower.includes('closed won');
+
     if (isBackWithLibertyJ) {
       // 0. Handed to Liberty J -> Partner action to chase. Do not hassle Ross on his daily active desk!
       health = 'snoozed';
       healthReason = daysWithLibertyJ !== null
         ? `With Liberty J (${daysWithLibertyJ}d) — action with partner to chase`
         : 'With Liberty J — action with partner to chase';
+    } else if (isClosedWon) {
+      // Closed Won deals are closed successfully
+      health = 'healthy';
+      healthReason = 'Deal Won! Closed successfully.';
     } else if (futureMeeting || isMeetingBookedStage) {
       // 1. Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
       health = 'snoozed';

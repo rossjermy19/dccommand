@@ -7,7 +7,10 @@ export async function GET() {
   try {
     const deals = await getOpenDeals();
 
-    const totalPipelineValue = deals.reduce((acc, deal) => acc + (deal.amount || 0), 0);
+    const openActiveDeals = deals.filter(
+      (d) => d.stage !== 'closedwon' && d.stage !== '5030008021' && !d.stageLabel.toLowerCase().includes('closed won')
+    );
+    const totalPipelineValue = openActiveDeals.reduce((acc, deal) => acc + (deal.amount || 0), 0);
     const urgentCount = deals.filter((d) => d.health === 'urgent').length;
     const warningCount = deals.filter((d) => d.health === 'warning').length;
     const healthyCount = deals.filter((d) => d.health === 'healthy').length;
@@ -16,7 +19,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       stats: {
-        totalDeals: deals.length,
+        totalDeals: openActiveDeals.length,
         totalPipelineValue,
         urgentCount,
         warningCount,
