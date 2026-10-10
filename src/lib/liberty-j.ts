@@ -4,6 +4,8 @@ import { addDealNote } from './hubspot';
 import { saveCustomTag, removeCustomTag } from './tags';
 
 const LIBERTY_J_FILE = path.join(process.cwd(), 'data', 'liberty-j.json');
+const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
+const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
 
 export interface LibertyJDealRecord {
   isBackWithLibertyJ: boolean;
@@ -23,6 +25,141 @@ export function getLibertyJStatusMap(): Record<string, LibertyJDealRecord> {
     console.error('Error reading liberty-j status file:', err);
   }
   return {};
+}
+
+/**
+ * Synchronizes Liberty J state directly from HubSpot CRM notes.
+ * This ensures state persists forever even when server containers restart.
+ */
+export async function syncLibertyJStatusFromHubSpot(): Promise<Record<string, LibertyJDealRecord>> {
+  const localMap = getLibertyJStatusMap();
+  if (!TOKEN) return localMap;
+
+  try {
+    // 1. Search for Liberty J handoff notes in HubSpot CRM
+    const res = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'hs_note_body',
+            operator: 'CONTAINS_TOKEN',
+            value: '*Handed Back to Liberty J*'
+          }]
+        }],
+        properties: ['hs_note_body', 'hs_createdate'],
+        limit: 100
+      }),
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return localMap;
+    const data = await res.json();
+    const notes = data.results || [];
+    if (notes.length === 0) return localMap;
+
+    // 2. Batch fetch deal associations for these notes
+    const assocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inputs: notes.map((n: any) => ({ id: n.id }))
+      }),
+      cache: 'no-store',
+    });
+
+    if (!assocRes.ok) return localMap;
+    const assocData = await assocRes.json();
+
+    // 3. Check for any subsequent recall notes
+    const recallRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'hs_note_body',
+            operator: 'CONTAINS_TOKEN',
+            value: '*Deal Recalled from Liberty J*'
+          }]
+        }],
+        properties: ['hs_note_body', 'hs_createdate'],
+        limit: 100
+      }),
+      cache: 'no-store',
+    });
+
+    const recallDealMap: Record<string, number> = {};
+    if (recallRes.ok) {
+      const recallData = await recallRes.json();
+      const recallNotes = recallData.results || [];
+      if (recallNotes.length > 0) {
+        const rAssocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputs: recallNotes.map((n: any) => ({ id: n.id })) }),
+          cache: 'no-store',
+        });
+        if (rAssocRes.ok) {
+          const rAssocData = await rAssocRes.json();
+          (rAssocData.results || []).forEach((r: any) => {
+            const note = recallNotes.find((n: any) => n.id === r.from.id);
+            if (note) {
+              const d = new Date(note.properties.hs_createdate).getTime();
+              (r.to || []).forEach((t: any) => {
+                const dealId = t.toObjectId.toString();
+                if (!recallDealMap[dealId] || d > recallDealMap[dealId]) {
+                  recallDealMap[dealId] = d;
+                }
+              });
+            }
+          });
+        }
+      }
+    }
+
+    // 4. Merge discovered Liberty J state
+    const mergedMap = { ...localMap };
+    (assocData.results || []).forEach((r: any) => {
+      const note = notes.find((n: any) => n.id === r.from.id);
+      const handoffDate = note?.properties?.hs_createdate || new Date().toISOString();
+      const handoffTime = new Date(handoffDate).getTime();
+
+      (r.to || []).forEach((t: any) => {
+        const dealId = t.toObjectId.toString();
+        const recallTime = recallDealMap[dealId];
+        if (recallTime && recallTime > handoffTime) {
+          if (mergedMap[dealId]) {
+            mergedMap[dealId].isBackWithLibertyJ = false;
+          }
+          return;
+        }
+
+        mergedMap[dealId] = {
+          isBackWithLibertyJ: true,
+          date: handoffDate,
+          note: mergedMap[dealId]?.note,
+          lastChasedDate: mergedMap[dealId]?.lastChasedDate,
+          chaseCount: mergedMap[dealId]?.chaseCount || 0,
+        };
+
+        saveCustomTag(dealId, 'Back with Liberty J');
+      });
+    });
+
+    try {
+      fs.mkdirSync(path.dirname(LIBERTY_J_FILE), { recursive: true });
+      fs.writeFileSync(LIBERTY_J_FILE, JSON.stringify(mergedMap, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('Failed to cache liberty-j.json:', err);
+    }
+
+    return mergedMap;
+  } catch (err) {
+    console.error('Error syncing Liberty J from HubSpot:', err);
+    return localMap;
+  }
 }
 
 export function saveLibertyJStatus(dealId: string, record: LibertyJDealRecord): void {

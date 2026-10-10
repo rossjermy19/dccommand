@@ -1,7 +1,7 @@
 import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
-import { getLibertyJStatusMap } from './liberty-j';
+import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -87,6 +87,21 @@ export async function getOpenDeals(): Promise<Deal[]> {
         operator: 'NEQ',
         value: 'closedlost',
       },
+      {
+        propertyName: 'dealstage',
+        operator: 'NEQ',
+        value: 'closedwon',
+      },
+      {
+        propertyName: 'dealstage',
+        operator: 'NEQ',
+        value: '5030008022',
+      },
+      {
+        propertyName: 'pipeline',
+        operator: 'EQ',
+        value: 'default',
+      },
     ],
     properties: [
       'dealname',
@@ -135,11 +150,18 @@ export async function getOpenDeals(): Promise<Deal[]> {
   const allResults = data.results || [];
   const now = new Date().getTime();
 
-  // Strictly filter out ANY Closed Lost deals
+  // Strictly filter out ANY Closed Lost, Closed Won deals, or non-default pipeline deals
   const rawDeals = allResults.filter((item: any) => {
     const stageId = (item.properties?.dealstage || '').toLowerCase();
     const stageLabel = (stageLabels[stageId] || STAGE_LABELS[stageId] || '').toLowerCase();
+    const pipeline = (item.properties?.pipeline || '').toLowerCase();
+    if (pipeline && pipeline !== 'default') {
+      return false;
+    }
     if (stageId === 'closedlost' || stageId === '5030008022' || stageId.includes('lost') || stageLabel.includes('lost')) {
+      return false;
+    }
+    if (stageId === 'closedwon' || stageLabel.includes('won')) {
       return false;
     }
     return true;
@@ -259,7 +281,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
   const customTagsMap = getCustomTagsMap();
   const alignedStoriesMap = getAlignedStoriesMap();
-  const libertyJMap = getLibertyJStatusMap();
+  const libertyJMap = await syncLibertyJStatusFromHubSpot();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
