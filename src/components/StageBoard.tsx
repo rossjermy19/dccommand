@@ -312,10 +312,6 @@ export function StageBoard({
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200">
                 <div className="truncate pr-2">
                   <div className="flex items-center space-x-1.5">
-                    <span className="text-[10px] font-black text-slate-400 w-3.5">
-                      {index + 1}.
-                    </span>
-
                     {col.isLibertyJ ? (
                       <div className="flex items-center space-x-1.5 truncate">
                         <div className="h-3.5 w-6 bg-white rounded p-0.5 border border-teal-200 shadow-2xs shrink-0 flex items-center justify-center">
@@ -347,7 +343,7 @@ export function StageBoard({
                   </div>
 
                   <p
-                    className={`text-[11px] font-mono font-bold mt-0.5 ml-5 ${
+                    className={`text-[11px] font-mono font-bold mt-0.5 ${
                       col.isClosedWon ? 'text-emerald-700 font-extrabold' : 'text-slate-700'
                     }`}
                   >
