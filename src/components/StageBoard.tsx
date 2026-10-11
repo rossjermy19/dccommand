@@ -26,7 +26,8 @@ export const COLUMN_TO_HUBSPOT_STAGE: Record<string, { stage: string; label: str
   no_response: { stage: '1352329431', label: 'No Response' },
   meeting_booked: { stage: '1209215206', label: 'Meeting Booked' },
   meeting_held: { stage: 'presentationscheduled', label: 'Meeting Held' },
-  upside: { stage: '1465977055', label: 'Upside expected to close' },
+  upside: { stage: '1465977055', label: 'Upside' },
+  expected_to_close: { stage: '1965601015', label: 'Expected to Close' },
   committed: { stage: 'decisionmakerboughtin', label: 'Committed' },
   contract_sent: { stage: 'contractsent', label: 'Contract Sent' },
   closed_won: { stage: 'closedwon', label: 'Closed Won' },
@@ -56,7 +57,8 @@ export const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
   { id: 'no_response', label: 'No Response', badgeClass: 'bg-slate-200/80 text-slate-800' },
   { id: 'meeting_booked', label: 'Meeting Booked', badgeClass: 'bg-indigo-100 text-indigo-900 border border-indigo-200' },
   { id: 'meeting_held', label: 'Meeting Held', badgeClass: 'bg-purple-100 text-purple-900 border border-purple-200' },
-  { id: 'upside', label: 'Upside expected to close', badgeClass: 'bg-sky-100 text-sky-900 border border-sky-200' },
+  { id: 'upside', label: 'Upside', badgeClass: 'bg-sky-100 text-sky-900 border border-sky-200' },
+  { id: 'expected_to_close', label: 'Expected to Close', badgeClass: 'bg-cyan-100 text-cyan-900 border border-cyan-200' },
   { id: 'committed', label: 'Committed', badgeClass: 'bg-blue-100 text-blue-900 border border-blue-200' },
   { id: 'contract_sent', label: 'Contract Sent', badgeClass: 'bg-amber-100 text-amber-900 border border-amber-200' },
   {
@@ -162,18 +164,24 @@ export function getDealPipelineColumnId(deal: Deal): string | null {
     return 'meeting_held';
   }
 
-  // 9. Upside Expected to Close
+  // 8. Upside
   if (
     stageId === '1465977055' ||
-    stageId === '1965601015' ||
     stageId === '5030008017' ||
-    stageId === '5030008018' ||
-    stageLabel.includes('upside') ||
-    stageLabel.includes('expected to close') ||
+    (stageLabel.includes('upside') && !stageLabel.includes('expected to close')) ||
     stageLabel.includes('proposal') ||
     stageLabel.includes('evaluation')
   ) {
     return 'upside';
+  }
+
+  // 9. Expected to Close
+  if (
+    stageId === '1965601015' ||
+    stageId === '5030008018' ||
+    stageLabel.includes('expected to close')
+  ) {
+    return 'expected_to_close';
   }
 
   // 10. Committed
