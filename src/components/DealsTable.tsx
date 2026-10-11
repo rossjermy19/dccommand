@@ -97,12 +97,12 @@ export function DealsTable({
         </div>
 
         {/* Filter Controls */}
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           {/* Stage Dropdown */}
           <select
             value={selectedStage}
             onChange={(e) => setSelectedStage(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
+            className="w-full sm:w-auto bg-white border border-slate-200 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
           >
             <option value="ALL">All Stages ({deals.length})</option>
             {stages.map((st) => (
@@ -116,7 +116,7 @@ export function DealsTable({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
+            className="w-full sm:w-auto bg-white border border-slate-200 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs"
           >
             <option value="recent">Sort: Most Recently Active</option>
             <option value="amount">Sort: Highest Deal Value</option>
@@ -127,7 +127,7 @@ export function DealsTable({
 
       {/* Table Content (Light Theme) */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[720px]">
           <thead>
             <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 bg-slate-50 font-bold">
               <th className="py-3 px-4">Deal Name</th>

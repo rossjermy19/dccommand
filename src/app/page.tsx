@@ -197,18 +197,19 @@ export default function DashboardPage() {
 
             {/* Navigation Bar & Mode Switcher */}
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-              {/* Primary Views Tabs */}
-              <div className="flex items-center space-x-2 flex-wrap">
+              {/* Primary Views Tabs (Touch scrollable on mobile) */}
+              <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
                 <button
                   onClick={() => setViewMode('mission')}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm shrink-0 whitespace-nowrap min-h-[38px] ${
                     viewMode === 'mission'
                       ? 'bg-blue-600 text-white shadow-blue-500/20'
                       : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Target className={`h-4 w-4 ${viewMode === 'mission' ? 'text-amber-300' : 'text-amber-500'}`} />
-                  <span>Daily Clear-Desk Command</span>
+                  <Target className={`h-4 w-4 shrink-0 ${viewMode === 'mission' ? 'text-amber-300' : 'text-amber-500'}`} />
+                  <span className="hidden sm:inline">Daily Clear-Desk Command</span>
+                  <span className="inline sm:hidden">Clear Desk</span>
                   {pendingMissionsCount > 0 && (
                     <span className="text-[10px] bg-rose-500 text-white font-extrabold px-1.5 py-0.2 rounded-full ml-1">
                       {pendingMissionsCount}
@@ -218,14 +219,15 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => setViewMode('stages')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm shrink-0 whitespace-nowrap min-h-[38px] ${
                     viewMode === 'stages'
                       ? 'bg-blue-600 text-white shadow-blue-500/20'
                       : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Kanban className="h-3.5 w-3.5" />
-                  <span>Pipeline Board</span>
+                  <Kanban className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Pipeline Board</span>
+                  <span className="inline sm:hidden">Pipeline</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                     viewMode === 'stages' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
@@ -235,45 +237,47 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => setViewMode('radar')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm shrink-0 whitespace-nowrap min-h-[38px] ${
                     viewMode === 'radar'
                       ? 'bg-blue-600 text-white shadow-blue-500/20'
                       : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Flame className={`h-3.5 w-3.5 ${viewMode === 'radar' ? 'text-amber-300' : 'text-amber-500'}`} />
-                  <span>Action Radar</span>
+                  <Flame className={`h-3.5 w-3.5 shrink-0 ${viewMode === 'radar' ? 'text-amber-300' : 'text-amber-500'}`} />
+                  <span className="hidden sm:inline">Action Radar</span>
+                  <span className="inline sm:hidden">Radar</span>
                 </button>
 
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm shrink-0 whitespace-nowrap min-h-[38px] ${
                     viewMode === 'table'
                       ? 'bg-blue-600 text-white shadow-blue-500/20'
                       : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <Table className="h-3.5 w-3.5" />
-                  <span>All Deals Table</span>
+                  <Table className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">All Deals Table</span>
+                  <span className="inline sm:hidden">Table</span>
                 </button>
               </div>
 
               {/* Tag Filters & Search Box */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Search Input */}
-                <div className="relative min-w-[200px] sm:min-w-[240px]">
+                <div className="relative flex-1 sm:flex-initial min-w-[170px] sm:min-w-[220px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search deals, tags, stages..."
+                    placeholder="Search deals, tags..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-sm"
+                    className="w-full pl-8 pr-7 py-2 sm:py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-sm"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -285,7 +289,7 @@ export default function DashboardPage() {
                   onClick={() =>
                     setSelectedTagFilter(selectedTagFilter === 'Liberty J' ? 'ALL' : 'Liberty J')
                   }
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border shadow-sm ${
+                  className={`flex items-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition border shadow-sm shrink-0 min-h-[34px] ${
                     selectedTagFilter === 'Liberty J'
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
                       : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
@@ -302,11 +306,11 @@ export default function DashboardPage() {
                 </button>
 
                 {/* Dynamic Tag Filter Dropdown */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <select
                     value={selectedTagFilter === 'Liberty J' ? 'ALL' : selectedTagFilter}
                     onChange={(e) => setSelectedTagFilter(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-sm"
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-sm max-w-[130px] sm:max-w-none truncate min-h-[34px]"
                   >
                     <option value="ALL">All Sources & Tags</option>
                     {availableSources.map((source) => (
@@ -325,7 +329,7 @@ export default function DashboardPage() {
                       setSelectedTagFilter('ALL');
                       setSearchQuery('');
                     }}
-                    className="text-[11px] text-slate-600 hover:text-slate-900 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg font-medium transition shadow-sm"
+                    className="text-[11px] text-slate-600 hover:text-slate-900 px-2.5 py-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg font-medium transition shadow-sm shrink-0 min-h-[34px]"
                   >
                     Reset All
                   </button>

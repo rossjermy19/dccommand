@@ -289,9 +289,39 @@ export function StageBoard({
   }
 
   return (
-    <div className="w-full space-y-4">
-      {/* Stage Columns Horizontal Board (Light Mode) */}
-      <div className="flex gap-4 overflow-x-auto pb-6 pt-1 items-start scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+    <div className="w-full space-y-3 sm:space-y-4">
+      {/* Mobile Quick-Jump Stage Pills (Visible on small screens) */}
+      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-3 px-3">
+        {stageColumns.map((col) => (
+          <button
+            key={`pill-${col.id}`}
+            onClick={() => {
+              const el = document.getElementById(`column-${col.id}`);
+              el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }}
+            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition border shadow-2xs active:scale-95 ${
+              col.isLibertyJ
+                ? 'bg-teal-50 text-teal-900 border-teal-300'
+                : col.isClosedWon
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                : 'bg-white text-slate-700 border-slate-200'
+            }`}
+          >
+            {col.isLibertyJ && (
+              <div className="h-3 w-5 bg-white rounded p-0.5 border border-teal-200 shrink-0 flex items-center justify-center">
+                <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
+              </div>
+            )}
+            <span className="truncate max-w-[110px]">{col.label}</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              {col.deals.length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Stage Columns Horizontal Board (Light Mode with smooth mobile swipe snap) */}
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 pt-1 items-start snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent -mx-3 px-3 sm:mx-0 sm:px-0">
         {stageColumns.map((col, index) => {
           const formattedColValue = new Intl.NumberFormat('en-GB', {
             style: 'currency',
@@ -304,7 +334,8 @@ export function StageBoard({
           return (
             <div
               key={col.id}
-              className={`w-72 sm:w-80 shrink-0 flex flex-col bg-slate-100/70 border rounded-2xl p-3 transition ${
+              id={`column-${col.id}`}
+              className={`w-[84vw] max-w-[320px] sm:w-80 shrink-0 snap-start flex flex-col bg-slate-100/70 border rounded-2xl p-3 transition ${
                 col.columnClass || 'border-slate-200/90 shadow-2xs'
               } ${isFaded ? 'opacity-40 hover:opacity-100' : ''}`}
             >

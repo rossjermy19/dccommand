@@ -71,9 +71,9 @@ export function RadarView({
       {/* 1. UNPLANNED STALLED (CRITICAL) */}
       {showUrgent && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-rose-200 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-rose-200 pb-2">
             <h2 className="text-sm font-bold text-rose-800 flex items-center space-x-2 uppercase tracking-wider">
-              <Flame className="h-4 w-4 text-rose-600" />
+              <Flame className="h-4 w-4 text-rose-600 shrink-0" />
               <span>Unplanned Stalled Deals ({urgentDeals.length})</span>
             </h2>
             <span className="text-[11px] text-rose-600 font-medium">&gt; 7 days without contact and no scheduled task</span>
@@ -104,9 +104,9 @@ export function RadarView({
       {/* 2. ACTION DUE */}
       {showWarning && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-amber-200 pb-2">
             <h2 className="text-sm font-bold text-amber-800 flex items-center space-x-2 uppercase tracking-wider">
-              <Clock className="h-4 w-4 text-amber-600" />
+              <Clock className="h-4 w-4 text-amber-600 shrink-0" />
               <span>Action Due Today / Post-Meeting ({warningDeals.length})</span>
             </h2>
             <span className="text-[11px] text-amber-700 font-medium">Task due or next touch required</span>
@@ -137,9 +137,9 @@ export function RadarView({
       {/* 3. PLANNED FOLLOW-UPS */}
       {showPlanned && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-indigo-200 pb-2">
             <h2 className="text-sm font-bold text-indigo-800 flex items-center space-x-2 uppercase tracking-wider">
-              <CalendarCheck className="h-4 w-4 text-indigo-600" />
+              <CalendarCheck className="h-4 w-4 text-indigo-600 shrink-0" />
               <span>Planned Follow-ups ({plannedDeals.length})</span>
             </h2>
             <span className="text-[11px] text-indigo-600 font-medium">Under control with scheduled HubSpot tasks</span>
@@ -170,9 +170,9 @@ export function RadarView({
       {/* 4. IN MOMENTUM */}
       {showHealthy && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-emerald-200 pb-2">
             <h2 className="text-sm font-bold text-emerald-800 flex items-center space-x-2 uppercase tracking-wider">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>In Momentum ({healthyDeals.length})</span>
             </h2>
             <span className="text-[11px] text-emerald-600 font-medium">Contacted within 3 days or today</span>

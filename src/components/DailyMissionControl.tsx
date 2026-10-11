@@ -186,17 +186,17 @@ export function DailyMissionControl({
   return (
     <div className="space-y-5">
       {/* Gamified Header: Clean Light Mode Banner */}
-      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-100 rounded-2xl p-5 sm:p-6 shadow-2xs">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-100 rounded-2xl p-4 sm:p-6 shadow-2xs">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5 sm:gap-4">
           <div>
-            <div className="flex items-center space-x-2 mb-1.5">
+            <div className="flex items-center space-x-2 mb-1">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100/80 text-blue-800 border border-blue-200">
                 <Zap className="h-3.5 w-3.5 text-blue-600" />
                 <span>Daily Clear-Desk Command</span>
               </span>
               <span className="text-xs text-slate-500 font-medium">Ross Jermy</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
               {unclearedAllMissions.length === 0
                 ? "Clean Desk Achieved!"
                 : `${unclearedAllMissions.length} active deal actions today.`}
@@ -209,7 +209,7 @@ export function DailyMissionControl({
           </div>
 
           {/* Progress Bar Widget */}
-          <div className="w-full md:w-72 bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-2xs shrink-0">
+          <div className="w-full md:w-72 bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs shrink-0">
             <div className="flex items-center justify-between text-xs font-bold mb-2">
               <span className="text-slate-700 flex items-center gap-1">
                 <Trophy className="h-3.5 w-3.5 text-amber-500" />
@@ -234,11 +234,11 @@ export function DailyMissionControl({
         </div>
       </div>
 
-      {/* Status Filters Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+      {/* Status Filters Bar (Horizontal scroll on mobile) */}
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 text-xs -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-none">
         <button
           onClick={() => setStatusFilter('all')}
-          className={`px-3 py-1.5 rounded-lg font-bold transition shrink-0 ${
+          className={`px-3 py-2 sm:py-1.5 rounded-lg font-bold transition shrink-0 whitespace-nowrap min-h-[34px] ${
             statusFilter === 'all'
               ? 'bg-slate-900 text-white shadow-2xs'
               : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -352,7 +352,7 @@ export function DailyMissionControl({
                   setCopiedLibertyJList(true);
                   setTimeout(() => setCopiedLibertyJList(false), 2500);
                 }}
-                className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-teal-200 text-teal-900 rounded-xl text-xs font-bold shadow-2xs transition shrink-0"
+                className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-teal-200 text-teal-900 rounded-xl text-xs font-bold shadow-2xs transition w-full sm:w-auto shrink-0 min-h-[38px]"
               >
                 {copiedLibertyJList ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-teal-700" />}
                 <span>{copiedLibertyJList ? 'Copied Chase List!' : 'Copy Liberty J Catch-up List'}</span>
@@ -360,20 +360,20 @@ export function DailyMissionControl({
             </div>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-teal-200/70">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mt-4 pt-3 border-t border-teal-200/70">
               <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
-                <p className="text-[10.5px] uppercase font-bold text-slate-500">Deals with Partner</p>
-                <p className="text-lg font-black text-slate-900 mt-0.5">{libertyJDeals.length}</p>
+                <p className="text-[10px] sm:text-[10.5px] uppercase font-bold text-slate-500">Deals with Partner</p>
+                <p className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{libertyJDeals.length}</p>
               </div>
               <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
-                <p className="text-[10.5px] uppercase font-bold text-slate-500">Pipeline Value</p>
-                <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                <p className="text-[10px] sm:text-[10.5px] uppercase font-bold text-slate-500">Pipeline Value</p>
+                <p className="text-base sm:text-lg font-black text-emerald-700 font-mono mt-0.5">
                   {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(libertyJTotalValue)}
                 </p>
               </div>
-              <div className="bg-white/80 p-2.5 rounded-xl border border-teal-100">
-                <p className="text-[10.5px] uppercase font-bold text-slate-500">Waiting &gt; 7 Days</p>
-                <p className="text-lg font-black text-amber-600 mt-0.5 flex items-center gap-1">
+              <div className="col-span-2 sm:col-span-1 bg-white/80 p-2.5 rounded-xl border border-teal-100">
+                <p className="text-[10px] sm:text-[10.5px] uppercase font-bold text-slate-500">Waiting &gt; 7 Days</p>
+                <p className="text-base sm:text-lg font-black text-amber-600 mt-0.5 flex items-center gap-1">
                   <span>{libertyJNeedsKickCount}</span>
                   {libertyJNeedsKickCount > 0 && <span className="text-[11px] font-bold text-amber-700">Needs Kick</span>}
                 </p>

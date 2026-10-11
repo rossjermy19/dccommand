@@ -356,20 +356,20 @@ export function DealDrawer({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end">
-      <div className="w-full max-w-2xl bg-white border-l border-slate-200 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="w-full sm:max-w-2xl bg-white border-l border-slate-200 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Drawer Header (Light Theme) */}
-        <div className="p-6 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
+        <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {/* Interactive Stage Dropdown */}
-                <div className="flex items-center space-x-1.5 bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
+                <div className="flex items-center space-x-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
                   <span className="text-[10px] font-bold uppercase text-blue-700 tracking-wider">Stage:</span>
                   <select
                     value={currentStage}
                     onChange={(e) => handleStageChange(e.target.value)}
                     disabled={isUpdatingStage}
-                    className="text-xs font-bold bg-transparent text-blue-800 focus:outline-none cursor-pointer"
+                    className="text-xs font-bold bg-transparent text-blue-800 focus:outline-none cursor-pointer max-w-[140px] sm:max-w-none truncate"
                   >
                     {PIPELINE_STAGES.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -380,7 +380,7 @@ export function DealDrawer({
                   {isUpdatingStage && <RefreshCw className="h-3 w-3 text-blue-600 animate-spin" />}
                 </div>
 
-                <span className="text-sm font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded">
+                <span className="text-xs sm:text-sm font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                   {formattedAmount}
                 </span>
 
@@ -392,18 +392,18 @@ export function DealDrawer({
                 />
               </div>
 
-              <h2 className="text-xl font-black text-slate-900 mt-2.5 leading-snug">
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 mt-2 sm:mt-2.5 leading-snug break-words">
                 {deal.name}
               </h2>
 
               {deal.isBackWithLibertyJ && (
-                <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex items-center justify-between shadow-2xs">
+                <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
                   <div className="flex items-center space-x-2.5">
                     <div className="h-7 w-12 bg-white border border-teal-200 rounded-lg p-0.5 flex items-center justify-center shrink-0 shadow-2xs">
                       <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-teal-950 flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-teal-950 flex items-center gap-1.5 flex-wrap">
                         <span>Currently Handed to Liberty J</span>
                         <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded">
                           {deal.daysWithLibertyJ !== null && deal.daysWithLibertyJ !== undefined ? `${deal.daysWithLibertyJ}d with partner` : 'With partner'}
@@ -419,7 +419,7 @@ export function DealDrawer({
                       setLibertyJMode('kick');
                       setIsLibertyJModalOpen(true);
                     }}
-                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs shrink-0"
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs shrink-0 self-end sm:self-auto"
                     title="Log that you chased Liberty J on progress"
                   >
                     <Zap className="h-3.5 w-3.5" />
@@ -429,27 +429,27 @@ export function DealDrawer({
               )}
             </div>
 
-            <div className="flex items-center space-x-1.5 flex-shrink-0">
+            <div className="flex items-center space-x-1 flex-shrink-0">
               <a
                 href={deal.hubspotUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition min-h-[36px] min-w-[36px] flex items-center justify-center"
                 title="View in HubSpot CRM"
               >
                 <ExternalLink className="h-4 w-4" />
               </a>
               <button
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition min-h-[36px] min-w-[36px] flex items-center justify-center"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          {/* Quick Action Activity Buttons */}
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-200/80 flex-wrap">
+          {/* Quick Action Activity Buttons (Horizontal scroll on mobile) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 mt-3 sm:mt-4 pt-3 border-t border-slate-200/80 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
             <button
               onClick={() => {
                 setShowAddMeeting(!showAddMeeting);
@@ -552,32 +552,32 @@ export function DealDrawer({
         </div>
 
         {/* Tab Navigation (Light Theme) */}
-        <div className="flex border-b border-slate-200 bg-white px-6">
+        <div className="flex border-b border-slate-200 bg-white px-3 sm:px-6 overflow-x-auto scrollbar-none whitespace-nowrap">
           <button
             onClick={() => setActiveTab('timeline')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition flex items-center space-x-2 ${
+            className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 sm:space-x-2 shrink-0 ${
               activeTab === 'timeline'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <FileText className="h-3.5 w-3.5" />
-            <span>Activity Timeline ({timelineItems.length})</span>
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            <span>Timeline ({timelineItems.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition flex items-center space-x-2 ${
+            className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 sm:space-x-2 shrink-0 ${
               activeTab === 'tasks'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <CheckSquare className="h-3.5 w-3.5" />
+            <CheckSquare className="h-3.5 w-3.5 shrink-0" />
             <span>Tasks ({tasks.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('contacts')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition flex items-center space-x-2 ${
+            className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 sm:space-x-2 shrink-0 ${
               activeTab === 'contacts'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
