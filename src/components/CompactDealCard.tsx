@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Deal } from '@/lib/types';
 import { 
   ExternalLink, 
@@ -9,7 +9,8 @@ import {
   Clock, 
   CheckCircle2, 
   CalendarCheck,
-  FileText
+  FileText,
+  Star
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
 
@@ -30,6 +31,40 @@ export function CompactDealCard({
   onOpenAlignedModal,
   onTagUpdated,
 }: CompactDealCardProps) {
+  const [isGold, setIsGold] = useState(!!deal.isGold);
+  const [isTogglingGold, setIsTogglingGold] = useState(false);
+
+  useEffect(() => {
+    setIsGold(!!deal.isGold);
+  }, [deal.isGold]);
+
+  const handleToggleGold = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isTogglingGold) return;
+
+    const nextGold = !isGold;
+    setIsGold(nextGold);
+    setIsTogglingGold(true);
+
+    try {
+      const res = await fetch(`/api/hubspot/deal/${deal.id}/gold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isGold: nextGold, dealName: deal.name }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setIsGold(!nextGold); // rollback
+      } else {
+        if (onTagUpdated) onTagUpdated();
+      }
+    } catch (err) {
+      setIsGold(!nextGold); // rollback
+    } finally {
+      setIsTogglingGold(false);
+    }
+  };
+
   const formattedAmount = deal.amount
     ? new Intl.NumberFormat('en-GB', {
         style: 'currency',
@@ -85,14 +120,29 @@ export function CompactDealCard({
   return (
     <div
       onClick={() => onSelectDeal(deal)}
-      className={`group relative bg-white hover:bg-slate-50/50 border shadow-2xs hover:shadow-md rounded-xl p-3 sm:p-3.5 transition flex flex-col justify-between cursor-pointer space-y-2.5 ${
-        deal.isBackWithLibertyJ
-          ? 'border-teal-300 hover:border-teal-400 ring-1 ring-teal-200/50 bg-teal-50/10'
-          : 'border-slate-200/90 hover:border-slate-300'
+      className={`group relative border shadow-2xs hover:shadow-md rounded-xl p-3 sm:p-3.5 transition flex flex-col justify-between cursor-pointer space-y-2.5 ${
+        isGold
+          ? 'border-amber-400 bg-gradient-to-br from-amber-50/95 via-yellow-50/70 to-amber-100/60 ring-2 ring-amber-400/60 shadow-md shadow-amber-500/20 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/30'
+          : deal.isBackWithLibertyJ
+          ? 'bg-white hover:bg-slate-50/50 border-teal-300 hover:border-teal-400 ring-1 ring-teal-200/50'
+          : 'bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300'
       }`}
     >
-      {/* Top Banner if Back with Liberty J */}
-      {deal.isBackWithLibertyJ && (
+      {/* Top Banner if Gold (High Chance to go ahead) */}
+      {isGold && (
+        <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-amber-950 -mx-3 sm:-mx-3.5 -mt-3 sm:-mt-3.5 px-3 py-1.5 rounded-t-xl border-b border-amber-400/80 flex items-center justify-between shadow-xs">
+          <div className="flex items-center space-x-1.5 font-black text-[10.5px] uppercase tracking-wider">
+            <Star className="h-3.5 w-3.5 fill-amber-950 text-amber-950" />
+            <span>High Chance to Go Ahead</span>
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-wider bg-amber-950/15 text-amber-950 px-1.5 py-0.5 rounded border border-amber-950/20">
+            Gold Deal
+          </span>
+        </div>
+      )}
+
+      {/* Top Banner if Back with Liberty J (only if not already Gold) */}
+      {!isGold && deal.isBackWithLibertyJ && (
         <div className="bg-gradient-to-r from-teal-500/15 via-emerald-500/10 to-teal-500/5 -mx-3 sm:-mx-3.5 -mt-3 sm:-mt-3.5 px-3 py-1.5 rounded-t-xl border-b border-teal-200/80 flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <div className="h-4 w-7 bg-white rounded border border-teal-200 p-0.5 flex items-center justify-center shrink-0 shadow-2xs">
@@ -108,7 +158,7 @@ export function CompactDealCard({
         </div>
       )}
 
-      {/* Top Header: Title & HubSpot link */}
+      {/* Top Header: Title & HubSpot link & Gold Star toggle */}
       <div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center space-x-1.5 min-w-0 flex-1">
@@ -124,21 +174,40 @@ export function CompactDealCard({
               {deal.name}
             </h4>
           </div>
-          <a
-            href={deal.hubspotUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="Open in HubSpot CRM"
-            className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition -mr-1"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+          <div className="flex items-center space-x-0.5 -mr-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleToggleGold}
+              disabled={isTogglingGold}
+              title={isGold ? 'High Chance deal (Gold) — Click to remove' : 'Mark as High Chance (Gold deal)'}
+              className={`p-1 rounded-md transition ${
+                isGold
+                  ? 'text-amber-600 bg-amber-100 hover:bg-amber-200'
+                  : 'text-slate-300 hover:text-amber-500 hover:bg-amber-50'
+              }`}
+            >
+              <Star className={`h-3.5 w-3.5 ${isGold ? 'fill-amber-400 text-amber-500' : ''}`} />
+            </button>
+            <a
+              href={deal.hubspotUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open in HubSpot CRM"
+              className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
 
         {/* Amount & Status Pill Row */}
         <div className="flex items-center justify-between gap-2 mt-1.5">
-          <span className="text-xs sm:text-sm font-bold font-mono text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded tracking-tight">
+          <span className={`text-xs sm:text-sm font-bold font-mono px-1.5 py-0.5 rounded tracking-tight ${
+            isGold
+              ? 'text-amber-950 bg-amber-200/90 border border-amber-400 font-extrabold shadow-2xs'
+              : 'text-emerald-800 bg-emerald-50 border border-emerald-200/60'
+          }`}>
             {formattedAmount}
           </span>
           {getHealthBadge()}

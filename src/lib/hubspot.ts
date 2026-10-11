@@ -2,6 +2,7 @@ import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
+import { syncGoldDealsFromHubSpot } from './gold-deals';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -282,6 +283,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
   const customTagsMap = getCustomTagsMap();
   const alignedStoriesMap = getAlignedStoriesMap();
   const libertyJMap = await syncLibertyJStatusFromHubSpot();
+  const goldDealsMap = await syncGoldDealsFromHubSpot();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
@@ -291,6 +293,11 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const rawSubSource = props.sub_source || null;
     const rawSource = props.source || null;
     const isLibertyJSource = rawSubSource === 'Liberty Jai' || /libby|liberty/i.test(rawSubSource || '') || customTags.some(t => /libby|liberty/i.test(t));
+
+    // Gold Deal Status Tracking (High Chance of Closing)
+    const goldRecord = goldDealsMap[item.id];
+    const isGold = !!(goldRecord?.isGold || customTags.includes('High Chance') || customTags.includes('Gold'));
+    const goldDate = goldRecord?.date || null;
 
     // Liberty J Status Tracking
     const libertyJRecord = libertyJMap[item.id];
@@ -305,12 +312,13 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const isNewDeal = daysOld <= 14;
 
     const tagsSet = new Set<string>();
+    if (isGold) tagsSet.add('High Chance');
     if (isLibertyJSource) tagsSet.add('Liberty J');
     if (isBackWithLibertyJ) tagsSet.add('Back with Liberty J');
     if (rawSubSource && rawSubSource !== 'Liberty Jai') tagsSet.add(rawSubSource);
     if (rawSource) tagsSet.add(rawSource);
     customTags.forEach((t) => {
-      if (!/libby|liberty/i.test(t) && t !== 'Back with Liberty J') tagsSet.add(t);
+      if (!/libby|liberty/i.test(t) && t !== 'Back with Liberty J' && t !== 'High Chance') tagsSet.add(t);
     });
     const tags = Array.from(tagsSet);
 
@@ -468,6 +476,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       isBackWithLibertyJ,
       backWithLibertyJDate,
       daysWithLibertyJ,
+      isGold,
+      goldDate,
     };
   });
 }

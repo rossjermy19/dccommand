@@ -23,7 +23,8 @@ import {
   RefreshCw,
   Bell,
   Archive,
-  Zap
+  Zap,
+  Star
 } from 'lucide-react';
 import { LibertyJModal } from './LibertyJModal';
 
@@ -122,6 +123,37 @@ export function DealDrawer({
   const [isClosedLostModalOpen, setIsClosedLostModalOpen] = useState(false);
   const [isLibertyJModalOpen, setIsLibertyJModalOpen] = useState(false);
   const [libertyJMode, setLibertyJMode] = useState<'push' | 'kick' | 'recall'>('push');
+  const [isGold, setIsGold] = useState(!!deal?.isGold);
+  const [isTogglingGold, setIsTogglingGold] = useState(false);
+
+  useEffect(() => {
+    setIsGold(!!deal?.isGold);
+  }, [deal?.isGold]);
+
+  const handleToggleGold = async () => {
+    if (!deal || isTogglingGold) return;
+    const nextGold = !isGold;
+    setIsGold(nextGold);
+    setIsTogglingGold(true);
+
+    try {
+      const res = await fetch(`/api/hubspot/deal/${deal.id}/gold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isGold: nextGold, dealName: deal.name }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setIsGold(!nextGold); // rollback
+      } else {
+        if (onRefreshDeals) onRefreshDeals();
+      }
+    } catch (e) {
+      setIsGold(!nextGold); // rollback
+    } finally {
+      setIsTogglingGold(false);
+    }
+  };
 
   const handleStageChange = async (newStage: string) => {
     if (!deal || newStage === currentStage) return;
@@ -396,6 +428,35 @@ export function DealDrawer({
                 {deal.name}
               </h2>
 
+              {/* Gold Deal Status Banner */}
+              {isGold && (
+                <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-amber-500/10 border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                      <Star className="h-4 w-4 fill-amber-950 text-amber-950" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                        <span>High Chance to Go Ahead (Gold Deal)</span>
+                        <span className="text-[10px] font-bold bg-amber-200/80 text-amber-950 px-1.5 py-0.2 rounded border border-amber-300">
+                          Priority Focus
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-amber-800 font-medium">
+                        Assessed by Ross with high probability of closing. Highlighted gold across the command board.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleGold}
+                    disabled={isTogglingGold}
+                    className="px-2.5 py-1 text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition shrink-0 self-end sm:self-auto"
+                  >
+                    Unmark Gold
+                  </button>
+                </div>
+              )}
+
               {deal.isBackWithLibertyJ && (
                 <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
                   <div className="flex items-center space-x-2.5">
@@ -509,6 +570,21 @@ export function DealDrawer({
                 <span>Aligned Story</span>
               </button>
             )}
+
+            {/* Gold Deal High-Chance Toggle */}
+            <button
+              onClick={handleToggleGold}
+              disabled={isTogglingGold}
+              className={`flex items-center space-x-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border transition ${
+                isGold
+                  ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-400 text-amber-950 border-amber-400 shadow-sm shadow-amber-400/30'
+                  : 'bg-white hover:bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+              title="Toggle High Chance / Gold Deal"
+            >
+              <Star className={`h-3.5 w-3.5 ${isGold ? 'fill-amber-950 text-amber-950' : 'text-amber-500'}`} />
+              <span>{isGold ? 'Gold Deal (Active)' : 'Mark as Gold'}</span>
+            </button>
 
             {deal.isBackWithLibertyJ ? (
               <button

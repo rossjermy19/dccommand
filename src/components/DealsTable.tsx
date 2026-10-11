@@ -11,7 +11,8 @@ import {
   CheckCircle, 
   AlertCircle, 
   Clock, 
-  Calendar 
+  Calendar,
+  Star 
 } from 'lucide-react';
 
 interface DealsTableProps {
@@ -56,7 +57,11 @@ export function DealsTable({
 
         // Tag filter
         if (selectedTagFilter && selectedTagFilter !== 'ALL') {
-          const hasTag = d.tags?.includes(selectedTagFilter) || d.source === selectedTagFilter || d.subSource === selectedTagFilter;
+          const hasTag =
+            (selectedTagFilter === 'High Chance' && (d.isGold || d.tags?.includes('High Chance'))) ||
+            d.tags?.includes(selectedTagFilter) ||
+            d.source === selectedTagFilter ||
+            d.subSource === selectedTagFilter;
           if (!hasTag) return false;
         }
 
@@ -160,11 +165,20 @@ export function DealsTable({
                   <tr
                     key={deal.id}
                     onClick={() => onSelectDeal(deal)}
-                    className="hover:bg-slate-50/80 transition group cursor-pointer"
+                    className={`transition group cursor-pointer ${
+                      deal.isGold
+                        ? 'bg-amber-50/80 hover:bg-amber-100/70 border-l-4 border-l-amber-400'
+                        : 'hover:bg-slate-50/80'
+                    }`}
                   >
                     {/* Deal Name */}
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center space-x-1.5">
+                      <div className="font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center space-x-1.5 flex-wrap">
+                        {deal.isGold && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-amber-200/90 text-amber-950 px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
+                            ⭐ Gold
+                          </span>
+                        )}
                         <span>{deal.name}</span>
                         <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-70 transition text-slate-400" />
                       </div>
@@ -238,7 +252,30 @@ export function DealsTable({
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
+                      <div className="flex items-center justify-end space-x-1.5 sm:space-x-2">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await fetch(`/api/hubspot/deal/${deal.id}/gold`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ isGold: !deal.isGold, dealName: deal.name }),
+                              });
+                              if (onTagUpdated) onTagUpdated();
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          title={deal.isGold ? 'High Chance deal (Gold) — Click to unmark' : 'Mark as High Chance (Gold deal)'}
+                          className={`p-1.5 rounded-lg transition ${
+                            deal.isGold
+                              ? 'bg-amber-200 text-amber-950 hover:bg-amber-300'
+                              : 'bg-slate-100 hover:bg-amber-50 text-slate-400 hover:text-amber-600'
+                          }`}
+                        >
+                          <Star className={`h-3.5 w-3.5 ${deal.isGold ? 'fill-amber-500 text-amber-500' : ''}`} />
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

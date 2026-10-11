@@ -82,6 +82,8 @@ export interface Deal {
   isBackWithLibertyJ?: boolean;
   backWithLibertyJDate?: string | null;
   daysWithLibertyJ?: number | null;
+  isGold?: boolean;
+  goldDate?: string | null;
 }
 
 export interface PipelineStage {

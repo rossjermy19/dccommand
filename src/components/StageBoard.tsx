@@ -223,6 +223,7 @@ export function StageBoard({
       // Tag filter (Dynamic)
       if (selectedTagFilter !== 'ALL') {
         const hasTag =
+          (selectedTagFilter === 'High Chance' && (d.isGold || d.tags?.includes('High Chance'))) ||
           d.tags?.includes(selectedTagFilter) ||
           d.source === selectedTagFilter ||
           d.subSource === selectedTagFilter;

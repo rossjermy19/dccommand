@@ -512,22 +512,30 @@ export function DailyMissionControl({
             return (
               <div
                 key={mission.id}
-                className={`bg-white border rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-250 flex flex-col justify-between space-y-3 relative ${
+                className={`border rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-250 flex flex-col justify-between space-y-3 relative ${
                   isAnimating ? 'opacity-0 scale-95 -translate-y-2' : 'opacity-100 scale-100'
                 } ${
-                  mission.type === 'stalled'
-                    ? 'border-rose-200 hover:border-rose-300'
+                  mission.deal.isGold
+                    ? 'border-amber-400 bg-gradient-to-br from-amber-50/95 via-yellow-50/60 to-amber-100/50 ring-2 ring-amber-400/60 shadow-md shadow-amber-500/20'
+                    : mission.type === 'stalled'
+                    ? 'bg-white border-rose-200 hover:border-rose-300'
                     : mission.type === 'action_due'
-                    ? 'border-amber-200 hover:border-amber-300'
+                    ? 'bg-white border-amber-200 hover:border-amber-300'
                     : mission.type === 'new_deal'
-                    ? 'border-sky-200 hover:border-sky-300'
-                    : 'border-indigo-200 hover:border-indigo-300'
+                    ? 'bg-white border-sky-200 hover:border-sky-300'
+                    : 'bg-white border-indigo-200 hover:border-indigo-300'
                 }`}
               >
                 {/* Card Top Row: Urgency badge, Stage, Amount */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      {mission.deal.isGold && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border border-amber-400 shadow-2xs">
+                          <span>⭐</span>
+                          <span>GOLD DEAL</span>
+                        </span>
+                      )}
                       {mission.type === 'stalled' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                           <Flame className="h-3 w-3 text-rose-600" />
@@ -562,7 +570,11 @@ export function DailyMissionControl({
                       />
                     </div>
 
-                    <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                      mission.deal.isGold
+                        ? 'text-amber-950 bg-amber-200/90 border border-amber-400 font-extrabold shadow-2xs'
+                        : 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+                    }`}>
                       {formattedAmount}
                     </span>
                   </div>

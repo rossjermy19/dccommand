@@ -139,6 +139,11 @@ export default function DashboardPage() {
     ).length;
   }, [deals]);
 
+  // Compute Gold deals count for quick filter button
+  const goldDealsCount = useMemo(() => {
+    return deals.filter((d) => d.isGold || d.tags?.includes('High Chance')).length;
+  }, [deals]);
+
   // Compute pending missions count for the badge
   const pendingMissionsCount = useMemo(() => {
     return deals.filter((d) => d.health === 'urgent' || d.health === 'warning').length;
@@ -284,6 +289,27 @@ export default function DashboardPage() {
                   )}
                 </div>
 
+                {/* 1-Click Tag Filter: Gold Deals */}
+                <button
+                  onClick={() =>
+                    setSelectedTagFilter(selectedTagFilter === 'High Chance' ? 'ALL' : 'High Chance')
+                  }
+                  className={`flex items-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition border shadow-sm shrink-0 min-h-[34px] ${
+                    selectedTagFilter === 'High Chance'
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border-amber-400 shadow-amber-200'
+                      : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-50'
+                  }`}
+                  title="Filter to deals marked as High Chance (Gold Deals)"
+                >
+                  <span className="text-amber-500">⭐</span>
+                  <span>Gold Deals</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    selectedTagFilter === 'High Chance' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-100 text-amber-900'
+                  }`}>
+                    {goldDealsCount}
+                  </span>
+                </button>
+
                 {/* 1-Click Tag Filter: Liberty J */}
                 <button
                   onClick={() =>
@@ -308,7 +334,11 @@ export default function DashboardPage() {
                 {/* Dynamic Tag Filter Dropdown */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <select
-                    value={selectedTagFilter === 'Liberty J' ? 'ALL' : selectedTagFilter}
+                    value={
+                      selectedTagFilter === 'Liberty J' || selectedTagFilter === 'High Chance'
+                        ? 'ALL'
+                        : selectedTagFilter
+                    }
                     onChange={(e) => setSelectedTagFilter(e.target.value)}
                     className="bg-white border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-sm max-w-[130px] sm:max-w-none truncate min-h-[34px]"
                   >

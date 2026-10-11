@@ -38,7 +38,11 @@ export function RadarView({
     return deals.filter((d) => {
       // Dynamic Tag filter
       if (selectedTagFilter !== 'ALL') {
-        const hasTag = d.tags?.includes(selectedTagFilter) || d.source === selectedTagFilter || d.subSource === selectedTagFilter;
+        const hasTag =
+          (selectedTagFilter === 'High Chance' && (d.isGold || d.tags?.includes('High Chance'))) ||
+          d.tags?.includes(selectedTagFilter) ||
+          d.source === selectedTagFilter ||
+          d.subSource === selectedTagFilter;
         if (!hasTag) return false;
       }
 
