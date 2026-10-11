@@ -24,7 +24,9 @@ import {
   Bell,
   Archive,
   Zap,
-  Star
+  Star,
+  Bot,
+  Presentation
 } from 'lucide-react';
 import { LibertyJModal } from './LibertyJModal';
 
@@ -571,10 +573,10 @@ export function DealDrawer({
 
             <button
               onClick={() => onOpenAnalysis(deal)}
-              className="flex items-center space-x-1.5 text-xs font-bold bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition"
+              className="flex items-center space-x-1.5 text-xs font-bold bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg transition"
             >
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Analyze Fireflies</span>
+              <Bot className="h-3.5 w-3.5 text-purple-600" />
+              <span>Fireflies AI</span>
             </button>
 
             {onOpenAlignedModal && (
@@ -582,7 +584,7 @@ export function DealDrawer({
                 onClick={() => onOpenAlignedModal(deal)}
                 className="flex items-center space-x-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-lg border border-indigo-200 transition"
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                <Presentation className="h-3.5 w-3.5 text-indigo-600" />
                 <span>Aligned Story</span>
               </button>
             )}

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Deal } from '@/lib/types';
 import { 
   ExternalLink, 
-  Sparkles, 
+  Presentation,
+  Bot,
   Mail, 
   Clock, 
   CheckCircle2, 
@@ -179,7 +180,7 @@ export function CompactDealCard({
               type="button"
               onClick={handleToggleGold}
               disabled={isTogglingGold}
-              title={isGold ? 'High Chance deal (Gold) — Click to remove' : 'Mark as High Chance (Gold deal)'}
+              title={isGold ? 'Gold VIP (High Chance to Close) — Click to remove' : 'Mark as Gold VIP (High Chance to Close)'}
               className={`p-1 rounded-md transition ${
                 isGold
                   ? 'text-amber-600 bg-amber-100 hover:bg-amber-200'
@@ -253,10 +254,10 @@ export function CompactDealCard({
                 e.stopPropagation();
                 onOpenAlignedModal(deal);
               }}
-              title="Generate / View Aligned Deal Room Story"
-              className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition"
+              title="Aligned Deal Room Story (Pitch & Deck)"
+              className="p-1 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <Presentation className="h-3.5 w-3.5" />
             </button>
           )}
           <button
@@ -264,8 +265,8 @@ export function CompactDealCard({
               e.stopPropagation();
               onSelectDeal(deal);
             }}
-            title="View Notes, Emails & Tasks"
-            className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
+            title="View Deal Notes, History & Timeline"
+            className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-800 transition"
           >
             <FileText className="h-3.5 w-3.5" />
           </button>
@@ -274,10 +275,10 @@ export function CompactDealCard({
               e.stopPropagation();
               onSelectDealForAnalysis(deal);
             }}
-            title="Fireflies AI Meeting Insights"
-            className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-amber-600 transition"
+            title="Fireflies AI Meeting Intelligence"
+            className="p-1 rounded hover:bg-purple-50 text-slate-400 hover:text-purple-600 transition"
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <Bot className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => {
@@ -285,7 +286,7 @@ export function CompactDealCard({
               onDraftFollowUp(deal);
             }}
             title="Draft Follow-up Email"
-            className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"
+            className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"
           >
             <Mail className="h-3.5 w-3.5" />
           </button>

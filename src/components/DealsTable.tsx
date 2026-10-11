@@ -12,7 +12,8 @@ import {
   AlertCircle, 
   Clock, 
   Calendar,
-  Star 
+  Star,
+  Bot
 } from 'lucide-react';
 
 interface DealsTableProps {
@@ -281,10 +282,10 @@ export function DealsTable({
                             e.stopPropagation();
                             onSelectDealForAnalysis(deal);
                           }}
-                          title="Analyze Call / Meeting"
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                          title="Fireflies AI Meeting Analysis"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 transition"
                         >
-                          <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                          <Bot className="h-3.5 w-3.5 text-purple-600" />
                         </button>
                         <button
                           onClick={(e) => {
