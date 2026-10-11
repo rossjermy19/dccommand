@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Deal } from '@/lib/types';
 import { CompactDealCard } from './CompactDealCard';
 import { Layers, Zap, CheckCircle2 } from 'lucide-react';
@@ -15,7 +15,22 @@ interface StageBoardProps {
   onDraftFollowUp: (deal: Deal) => void;
   onOpenAlignedModal?: (deal: Deal) => void;
   onTagUpdated?: () => void;
+  onMoveDealStage?: (dealId: string, newStage: string, newStageLabel?: string, isLibertyJ?: boolean) => void;
 }
+
+export const COLUMN_TO_HUBSPOT_STAGE: Record<string, { stage: string; label: string; isLibertyJ?: boolean }> = {
+  new: { stage: 'appointmentscheduled', label: 'New Lead' },
+  backburning: { stage: '1638150379', label: 'Back Burning' },
+  contact_made: { stage: 'qualifiedtobuy', label: 'Contact Made' },
+  liberty_j: { stage: 'liberty_j', label: 'Liberty J', isLibertyJ: true },
+  no_response: { stage: '1352329431', label: 'No Response' },
+  meeting_booked: { stage: '1209215206', label: 'Meeting Booked' },
+  meeting_held: { stage: 'presentationscheduled', label: 'Meeting Held' },
+  upside: { stage: '1465977055', label: 'Upside expected to close' },
+  committed: { stage: 'decisionmakerboughtin', label: 'Committed' },
+  contract_sent: { stage: 'contractsent', label: 'Contract Sent' },
+  closed_won: { stage: 'closedwon', label: 'Closed Won' },
+};
 
 export interface PipelineColumnConfig {
   id: string;
@@ -206,7 +221,104 @@ export function StageBoard({
   onDraftFollowUp,
   onOpenAlignedModal,
   onTagUpdated,
+  onMoveDealStage,
 }: StageBoardProps) {
+  const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, deal: Deal) => {
+    e.dataTransfer.setData('text/plain', deal.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingDealId(deal.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingDealId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumnId !== colId) {
+      setDragOverColumnId(colId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, colId: string) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (dragOverColumnId === colId) {
+      setDragOverColumnId(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetColumnId: string) => {
+    e.preventDefault();
+    setDragOverColumnId(null);
+    const dealId = e.dataTransfer.getData('text/plain') || draggingDealId;
+    setDraggingDealId(null);
+
+    if (!dealId) return;
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    const currentColumnId = getDealPipelineColumnId(deal);
+    if (currentColumnId === targetColumnId) return;
+
+    const targetConfig = COLUMN_TO_HUBSPOT_STAGE[targetColumnId];
+    if (!targetConfig) return;
+
+    // 1. OPTIMISTIC UPDATE IMMEDIATELY
+    if (onMoveDealStage) {
+      onMoveDealStage(
+        dealId,
+        targetConfig.stage,
+        targetConfig.label,
+        targetConfig.isLibertyJ
+      );
+    }
+
+    // 2. BACKGROUND PERSISTENCE TO HUBSPOT CRM
+    try {
+      if (targetConfig.isLibertyJ) {
+        const res = await fetch(`/api/hubspot/deal/${dealId}/liberty-j`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'push', dealName: deal.name }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      } else if (deal.isBackWithLibertyJ) {
+        await fetch(`/api/hubspot/deal/${dealId}/liberty-j`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'recall' }),
+        });
+        const res = await fetch(`/api/hubspot/deal/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage: targetConfig.stage }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      } else {
+        const res = await fetch(`/api/hubspot/deal/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage: targetConfig.stage }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      }
+
+      if (onTagUpdated) onTagUpdated();
+    } catch (err: any) {
+      console.error('Drag and drop stage update failed:', err);
+      alert(`Could not move deal to ${targetConfig.label}: ${err.message || err}`);
+      if (onTagUpdated) onTagUpdated();
+    }
+  };
+
   // Filter deals based on active KPI filter, tags, and search
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
@@ -331,14 +443,20 @@ export function StageBoard({
           }).format(col.totalValue);
 
           const isFaded = activeFilter !== 'all' && col.deals.length === 0;
+          const isDropTarget = dragOverColumnId === col.id;
 
           return (
             <div
               key={col.id}
               id={`column-${col.id}`}
-              className={`w-[84vw] max-w-[320px] sm:w-80 shrink-0 snap-start flex flex-col bg-slate-100/70 border rounded-2xl p-3 transition ${
-                col.columnClass || 'border-slate-200/90 shadow-2xs'
-              } ${isFaded ? 'opacity-40 hover:opacity-100' : ''}`}
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDragLeave={(e) => handleDragLeave(e, col.id)}
+              onDrop={(e) => handleDrop(e, col.id)}
+              className={`w-[84vw] max-w-[320px] sm:w-80 shrink-0 snap-start flex flex-col border rounded-2xl p-3 transition ${
+                isDropTarget
+                  ? 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-400 shadow-md scale-[1.01]'
+                  : col.columnClass || 'bg-slate-100/70 border-slate-200/90 shadow-2xs'
+              } ${isFaded && !isDropTarget ? 'opacity-40 hover:opacity-100' : ''}`}
             >
               {/* Column Header */}
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200">
@@ -404,27 +522,45 @@ export function StageBoard({
               </div>
 
               {/* Cards inside Stage Column */}
-              <div className="space-y-2.5 min-h-[140px]">
-                {col.deals.length === 0 ? (
+              <div className="space-y-2.5 min-h-[140px] flex-1 flex flex-col justify-start">
+                {/* Visual Drop Target Placeholder */}
+                {isDropTarget && (
+                  <div className="border-2 border-dashed border-blue-400 bg-blue-100/70 rounded-xl p-3.5 text-center text-xs font-bold text-blue-900 animate-pulse flex items-center justify-center gap-1.5 shadow-2xs">
+                    <span>Drop card here → Move to {col.label}</span>
+                  </div>
+                )}
+
+                {col.deals.length === 0 && !isDropTarget ? (
                   <div className="h-28 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 rounded-xl text-[11px] text-slate-400 p-3">
                     <span>No deals in this stage</span>
                     {col.isLibertyJ && (
                       <span className="text-[10px] text-teal-600 mt-1">
-                        Push deals back using &quot;To Liberty J&quot;
+                        Drop deals here to assign to Liberty J
                       </span>
                     )}
                   </div>
                 ) : (
                   col.deals.map((deal) => (
-                    <CompactDealCard
+                    <div
                       key={deal.id}
-                      deal={deal}
-                      onSelectDeal={onSelectDeal}
-                      onSelectDealForAnalysis={onSelectDealForAnalysis}
-                      onDraftFollowUp={onDraftFollowUp}
-                      onOpenAlignedModal={onOpenAlignedModal}
-                      onTagUpdated={onTagUpdated}
-                    />
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, deal)}
+                      onDragEnd={handleDragEnd}
+                      className={`cursor-grab active:cursor-grabbing transition-all ${
+                        draggingDealId === deal.id
+                          ? 'opacity-30 scale-[0.97] ring-2 ring-blue-400 rounded-xl'
+                          : 'opacity-100'
+                      }`}
+                    >
+                      <CompactDealCard
+                        deal={deal}
+                        onSelectDeal={onSelectDeal}
+                        onSelectDealForAnalysis={onSelectDealForAnalysis}
+                        onDraftFollowUp={onDraftFollowUp}
+                        onOpenAlignedModal={onOpenAlignedModal}
+                        onTagUpdated={onTagUpdated}
+                      />
+                    </div>
                   ))
                 )}
               </div>

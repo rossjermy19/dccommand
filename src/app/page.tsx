@@ -105,6 +105,39 @@ export default function DashboardPage() {
     setIsAlignedModalOpen(true);
   };
 
+  const handleMoveDealStage = (
+    dealId: string,
+    newStage: string,
+    newStageLabel?: string,
+    isLibertyJ?: boolean
+  ) => {
+    setDeals((prev) =>
+      prev.map((d) => {
+        if (d.id !== dealId) return d;
+        const willBeLibertyJ = isLibertyJ !== undefined ? isLibertyJ : newStage === 'liberty_j';
+        return {
+          ...d,
+          stage: newStage === 'liberty_j' ? d.stage : newStage,
+          stageLabel: newStageLabel || d.stageLabel,
+          isBackWithLibertyJ: willBeLibertyJ,
+          daysWithLibertyJ: willBeLibertyJ ? 0 : null,
+        };
+      })
+    );
+
+    setSelectedDealForDrawer((prev) => {
+      if (!prev || prev.id !== dealId) return prev;
+      const willBeLibertyJ = isLibertyJ !== undefined ? isLibertyJ : newStage === 'liberty_j';
+      return {
+        ...prev,
+        stage: newStage === 'liberty_j' ? prev.stage : newStage,
+        stageLabel: newStageLabel || prev.stageLabel,
+        isBackWithLibertyJ: willBeLibertyJ,
+        daysWithLibertyJ: willBeLibertyJ ? 0 : null,
+      };
+    });
+  };
+
   const handleLogNote = async (dealId: string, noteBody: string) => {
     const res = await fetch('/api/hubspot/note', {
       method: 'POST',
@@ -392,6 +425,7 @@ export default function DashboardPage() {
                 onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
                 onOpenAlignedModal={handleOpenAlignedModal}
                 onTagUpdated={() => fetchDeals()}
+                onMoveDealStage={handleMoveDealStage}
               />
             )}
 
@@ -434,6 +468,7 @@ export default function DashboardPage() {
         onDraftFollowUp={(deal) => setDealForFollowUp(deal)}
         onOpenAlignedModal={handleOpenAlignedModal}
         onRefreshDeals={() => fetchDeals()}
+        onMoveDealStage={handleMoveDealStage}
       />
 
       {/* Transcript Intelligence Modal (Fireflies AI Deep-Dive) */}

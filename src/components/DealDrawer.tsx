@@ -35,6 +35,7 @@ interface DealDrawerProps {
   onDraftFollowUp: (deal: Deal) => void;
   onOpenAlignedModal?: (deal: Deal) => void;
   onRefreshDeals?: () => void;
+  onMoveDealStage?: (dealId: string, newStage: string, newStageLabel?: string, isLibertyJ?: boolean) => void;
 }
 
 export function DealDrawer({
@@ -44,6 +45,7 @@ export function DealDrawer({
   onDraftFollowUp,
   onOpenAlignedModal,
   onRefreshDeals,
+  onMoveDealStage,
 }: DealDrawerProps) {
   const [activeTab, setActiveTab] = useState<'timeline' | 'tasks' | 'contacts'>('timeline');
   const [loading, setLoading] = useState(false);
@@ -161,8 +163,18 @@ export function DealDrawer({
       setIsClosedLostModalOpen(true);
       return;
     }
-    setIsUpdatingStage(true);
+    const previousStage = currentStage;
     setCurrentStage(newStage);
+
+    const stageObj = PIPELINE_STAGES.find((s) => s.id === newStage);
+    const newStageLabel = stageObj?.label || newStage;
+
+    // 1. Optimistic immediate update across Kanban board & views
+    if (onMoveDealStage) {
+      onMoveDealStage(deal.id, newStage, newStageLabel, false);
+    }
+
+    setIsUpdatingStage(true);
     try {
       const res = await fetch(`/api/hubspot/deal/${deal.id}`, {
         method: 'PATCH',
@@ -174,7 +186,10 @@ export function DealDrawer({
       if (onRefreshDeals) onRefreshDeals();
     } catch (e: any) {
       alert(`Could not update stage in HubSpot: ${e.message}`);
-      setCurrentStage(deal.stage);
+      setCurrentStage(previousStage);
+      if (onMoveDealStage) {
+        onMoveDealStage(deal.id, previousStage, deal.stageLabel, deal.isBackWithLibertyJ);
+      }
     } finally {
       setIsUpdatingStage(false);
     }
@@ -317,6 +332,7 @@ export function DealDrawer({
 
       // Advance stage locally to Meeting Booked
       setCurrentStage('1209215206');
+      if (onMoveDealStage) onMoveDealStage(deal.id, '1209215206', 'Meeting Booked', false);
       setMeetingTitle('');
       setMeetingStartTime('');
       setMeetingBody('');
