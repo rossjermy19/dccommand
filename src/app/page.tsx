@@ -233,9 +233,8 @@ export default function DashboardPage() {
               }}
             />
 
-            {/* Navigation Bar & Mode Switcher */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-              {/* Primary Views Tabs (Touch scrollable on mobile) */}
+            {/* Tier 1: Primary View Navigation Bar (Clean & Roomy) */}
+            <div className="border-b border-slate-200 pb-2.5">
               <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
                 <button
                   onClick={() => setViewMode('mission')}
@@ -299,106 +298,114 @@ export default function DashboardPage() {
                   <span className="inline sm:hidden">Table</span>
                 </button>
               </div>
+            </div>
 
-              {/* Tag Filters & Search Box */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Search Input */}
-                <div className="relative flex-1 sm:flex-initial min-w-[170px] sm:min-w-[220px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search deals, tags..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-7 py-2 sm:py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-sm"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+            {/* Tier 2: Dedicated Pipeline Search & Filter Toolbar (Active for Pipeline, Radar & Table) */}
+            {viewMode !== 'mission' && (
+              <div className="flex flex-wrap items-center justify-between gap-2.5 p-2 sm:p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+                {/* Left: Search Deals + Source/Tag Dropdown */}
+                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
+                  {/* Search Input */}
+                  <div className="relative flex-1 sm:flex-initial min-w-[180px] sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search deals, tags, stages..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dynamic Tag/Source Filter Dropdown */}
+                  <div className="relative flex items-center shrink-0">
+                    <select
+                      value={
+                        selectedTagFilter === 'Liberty J' || selectedTagFilter === 'High Chance'
+                          ? 'ALL'
+                          : selectedTagFilter
+                      }
+                      onChange={(e) => setSelectedTagFilter(e.target.value)}
+                      className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                     >
-                      <X className="h-3 w-3" />
+                      <option value="ALL">All Sources & Tags</option>
+                      {availableSources.map((source) => (
+                        <option key={source} value={source}>
+                          {source}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right: 1-Click Quick Pills & Reset */}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* 1-Click Tag Filter: Gold Deals */}
+                  <button
+                    onClick={() =>
+                      setSelectedTagFilter(selectedTagFilter === 'High Chance' ? 'ALL' : 'High Chance')
+                    }
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border shadow-2xs shrink-0 ${
+                      selectedTagFilter === 'High Chance'
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border-amber-400 shadow-amber-200'
+                        : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-50'
+                    }`}
+                    title="Filter to deals marked as High Chance (Gold Deals)"
+                  >
+                    <span className="text-amber-500">⭐</span>
+                    <span>Gold Deals</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      selectedTagFilter === 'High Chance' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-100 text-amber-900'
+                    }`}>
+                      {goldDealsCount}
+                    </span>
+                  </button>
+
+                  {/* 1-Click Tag Filter: Liberty J */}
+                  <button
+                    onClick={() =>
+                      setSelectedTagFilter(selectedTagFilter === 'Liberty J' ? 'ALL' : 'Liberty J')
+                    }
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border shadow-2xs shrink-0 ${
+                      selectedTagFilter === 'Liberty J'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
+                        : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                    }`}
+                    title="Filter to deals originating from Liberty J"
+                  >
+                    <span className="text-amber-400">★</span>
+                    <span>Liberty J</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      selectedTagFilter === 'Liberty J' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-700'
+                    }`}>
+                      {libertyJDealsCount}
+                    </span>
+                  </button>
+
+                  {/* Reset Filters button */}
+                  {(activeFilter !== 'all' || selectedTagFilter !== 'ALL' || searchQuery) && (
+                    <button
+                      onClick={() => {
+                        setActiveFilter('all');
+                        setSelectedTagFilter('ALL');
+                        setSearchQuery('');
+                      }}
+                      className="text-[11px] text-slate-600 hover:text-slate-900 px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-medium transition shadow-2xs shrink-0"
+                    >
+                      Reset All
                     </button>
                   )}
                 </div>
-
-                {/* 1-Click Tag Filter: Gold Deals */}
-                <button
-                  onClick={() =>
-                    setSelectedTagFilter(selectedTagFilter === 'High Chance' ? 'ALL' : 'High Chance')
-                  }
-                  className={`flex items-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition border shadow-sm shrink-0 min-h-[34px] ${
-                    selectedTagFilter === 'High Chance'
-                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border-amber-400 shadow-amber-200'
-                      : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-50'
-                  }`}
-                  title="Filter to deals marked as High Chance (Gold Deals)"
-                >
-                  <span className="text-amber-500">⭐</span>
-                  <span>Gold Deals</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                    selectedTagFilter === 'High Chance' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-100 text-amber-900'
-                  }`}>
-                    {goldDealsCount}
-                  </span>
-                </button>
-
-                {/* 1-Click Tag Filter: Liberty J */}
-                <button
-                  onClick={() =>
-                    setSelectedTagFilter(selectedTagFilter === 'Liberty J' ? 'ALL' : 'Liberty J')
-                  }
-                  className={`flex items-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition border shadow-sm shrink-0 min-h-[34px] ${
-                    selectedTagFilter === 'Liberty J'
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
-                      : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
-                  }`}
-                  title="Filter to deals originating from Liberty J"
-                >
-                  <span className="text-amber-400">★</span>
-                  <span>Liberty J</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    selectedTagFilter === 'Liberty J' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-700'
-                  }`}>
-                    {libertyJDealsCount}
-                  </span>
-                </button>
-
-                {/* Dynamic Tag Filter Dropdown */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <select
-                    value={
-                      selectedTagFilter === 'Liberty J' || selectedTagFilter === 'High Chance'
-                        ? 'ALL'
-                        : selectedTagFilter
-                    }
-                    onChange={(e) => setSelectedTagFilter(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 shadow-sm max-w-[130px] sm:max-w-none truncate min-h-[34px]"
-                  >
-                    <option value="ALL">All Sources & Tags</option>
-                    {availableSources.map((source) => (
-                      <option key={source} value={source}>
-                        {source}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Reset Filters button */}
-                {(activeFilter !== 'all' || selectedTagFilter !== 'ALL' || searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setActiveFilter('all');
-                      setSelectedTagFilter('ALL');
-                      setSearchQuery('');
-                    }}
-                    className="text-[11px] text-slate-600 hover:text-slate-900 px-2.5 py-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg font-medium transition shadow-sm shrink-0 min-h-[34px]"
-                  >
-                    Reset All
-                  </button>
-                )}
               </div>
-            </div>
+            )}
 
             {/* View 1: Gamified Daily Mission Control (Default) */}
             {viewMode === 'mission' && (

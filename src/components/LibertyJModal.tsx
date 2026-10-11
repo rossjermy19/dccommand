@@ -54,7 +54,7 @@ export function LibertyJModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl my-auto animate-in zoom-in-95 duration-150">
         {/* Modal Header with Liberty J Brand Banner */}
         <div className="p-5 border-b border-teal-100 bg-gradient-to-r from-teal-50 via-emerald-50 to-slate-50 flex items-center justify-between">

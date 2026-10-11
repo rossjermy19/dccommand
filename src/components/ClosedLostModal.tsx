@@ -61,7 +61,7 @@ export function ClosedLostModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl my-auto animate-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="p-5 border-b border-rose-100 flex items-center justify-between bg-rose-50/50">

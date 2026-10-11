@@ -405,8 +405,15 @@ export function DealDrawer({
     : '—';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end">
-      <div className="w-full sm:max-w-2xl bg-white border-l border-slate-200 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+    <>
+      <div 
+        className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end"
+        onClick={onClose}
+      >
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className="w-full sm:max-w-2xl bg-white border-l border-slate-200 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200"
+        >
         {/* Drawer Header (Light Theme) */}
         <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-start justify-between gap-3">
@@ -1198,8 +1205,9 @@ export function DealDrawer({
           )}
         </div>
       </div>
+    </div>
 
-      <ClosedLostModal
+    <ClosedLostModal
         isOpen={isClosedLostModalOpen}
         deal={deal}
         onClose={() => setIsClosedLostModalOpen(false)}
@@ -1220,6 +1228,6 @@ export function DealDrawer({
           fetchDetails(deal.id);
         }}
       />
-    </div>
+    </>
   );
 }
