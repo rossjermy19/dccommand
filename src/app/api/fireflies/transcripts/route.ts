@@ -13,7 +13,18 @@ export async function GET(req: Request) {
       if (!details) {
         return NextResponse.json({ success: false, error: 'Transcript not found' }, { status: 404 });
       }
-      return NextResponse.json({ success: true, ...details });
+      return NextResponse.json({
+        success: true,
+        ...details,
+        fullText: details.fullText,
+        transcriptText: details.fullText,
+        summary: details.summary,
+        transcript: {
+          title: details.title,
+          fullText: details.fullText,
+          summary: { overview: details.summary },
+        },
+      });
     }
 
     const transcripts = await fetchRecentTranscripts(15);

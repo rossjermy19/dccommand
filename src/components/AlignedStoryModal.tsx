@@ -12,7 +12,8 @@ import {
   FileText, 
   CheckCircle2, 
   ExternalLink,
-  Save
+  Save,
+  AlertCircle
 } from 'lucide-react';
 
 interface AlignedStoryModalProps {
@@ -38,6 +39,7 @@ export function AlignedStoryModal({
   const [copied, setCopied] = useState(false);
   const [savedToHubSpot, setSavedToHubSpot] = useState(false);
   const [isSavingToHubSpot, setIsSavingToHubSpot] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // If deal already has an aligned story, load it directly!
   useEffect(() => {
@@ -48,6 +50,7 @@ export function AlignedStoryModal({
     }
     setCopied(false);
     setSavedToHubSpot(false);
+    setError(null);
   }, [deal]);
 
   // Load Fireflies transcripts
@@ -86,21 +89,29 @@ export function AlignedStoryModal({
   if (!isOpen || !deal) return null;
 
   const handleGenerate = async () => {
+    setError(null);
     setGenerating(true);
     try {
       let transcriptText = pastedTranscript;
 
       if (transcriptSource === 'fireflies' && selectedTranscriptId) {
-        const res = await fetch(`/api/fireflies/transcripts?id=${selectedTranscriptId}`);
-        const data = await res.json();
-        if (data.transcript) {
-          const sentences = data.transcript.sentences || [];
-          transcriptText = sentences
-            .map((s: any) => `${s.speaker_name || 'Speaker'}: ${s.text}`)
-            .join('\n');
-          if (!transcriptText) {
-            transcriptText = data.transcript.summary?.overview || data.transcript.title || '';
+        try {
+          const res = await fetch(`/api/fireflies/transcripts?id=${selectedTranscriptId}`);
+          const data = await res.json();
+          if (data.success) {
+            transcriptText =
+              data.fullText ||
+              data.transcriptText ||
+              data.transcript?.fullText ||
+              (data.transcript?.sentences
+                ? data.transcript.sentences.map((s: any) => `${s.speaker_name || 'Speaker'}: ${s.text}`).join('\n')
+                : '') ||
+              data.summary ||
+              data.transcript?.summary?.overview ||
+              '';
           }
+        } catch (fetchErr) {
+          console.warn('Direct transcript fetch failed, falling back to server-side resolution:', fetchErr);
         }
       }
 
@@ -120,9 +131,12 @@ export function AlignedStoryModal({
       if (data.success && data.story) {
         setStory(data.story);
         if (onStorySaved) onStorySaved(deal.id, data.story);
+      } else {
+        setError(data.error || 'Could not generate Aligned story. Please try again or paste notes.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate Aligned story:', err);
+      setError(err.message || 'An unexpected error occurred while generating the story.');
     } finally {
       setGenerating(false);
     }
@@ -276,10 +290,23 @@ export function AlignedStoryModal({
                 </div>
               )}
 
+              {/* Error Notification if generation fails */}
+              {error && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={handleGenerate}
                 disabled={generating || (transcriptSource === 'paste' && !pastedTranscript.trim())}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-sm shadow-indigo-600/20 transition"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-sm shadow-indigo-600/20 transition cursor-pointer"
               >
                 {generating ? (
                   <>
