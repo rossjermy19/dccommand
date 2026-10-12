@@ -1,16 +1,18 @@
 'use client';
 
 import React from 'react';
-import { AlertCircle, Clock, ShieldCheck, TrendingUp, CalendarCheck, Filter, X } from 'lucide-react';
+import { Clock, ShieldCheck, TrendingUp, CalendarCheck, Filter, X, Star } from 'lucide-react';
 
 interface KpiHeaderProps {
   stats: {
     totalDeals: number;
     totalPipelineValue: number;
-    urgentCount: number;
+    urgentCount?: number;
     warningCount: number;
     healthyCount: number;
     snoozedCount?: number;
+    goldCount?: number;
+    goldPipelineValue?: number;
   };
   filter: string;
   onSelectFilter: (filter: string) => void;
@@ -23,6 +25,12 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
     maximumFractionDigits: 0,
   }).format(stats.totalPipelineValue);
 
+  const formattedGoldValue = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+  }).format(stats.goldPipelineValue || 0);
+
   const toggle = (target: string) => {
     onSelectFilter(filter === target ? 'all' : target);
   };
@@ -30,7 +38,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
   return (
     <div className="space-y-3 mb-4 sm:mb-5">
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
-        {/* Total Pipeline */}
+        {/* 1. Total Active Pipeline */}
         <div 
           onClick={() => onSelectFilter('all')}
           className={`col-span-2 lg:col-span-1 p-3 sm:p-4 rounded-xl border transition cursor-pointer select-none relative group active:scale-[0.99] ${
@@ -52,31 +60,34 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           </div>
         </div>
 
-        {/* Critical / True Ghosting (> 7 days AND no task) */}
+        {/* 2. Gold VIP Deals (Total Value + Total Number of High-Chance Deals) */}
         <div 
-          onClick={() => toggle('urgent')}
+          onClick={() => toggle('gold')}
           className={`p-3 sm:p-4 rounded-xl border transition cursor-pointer select-none relative group active:scale-[0.99] ${
-            filter === 'urgent'
-              ? 'bg-rose-50 border-rose-500 shadow-sm ring-2 ring-rose-500/20'
-              : 'bg-white border-slate-200 shadow-2xs hover:border-rose-300 hover:bg-rose-50/30'
+            filter === 'gold'
+              ? 'bg-gradient-to-br from-amber-100 via-yellow-100 to-amber-200 border-amber-500 shadow-md ring-2 ring-amber-400/40 text-amber-950'
+              : 'bg-gradient-to-br from-amber-50/90 via-yellow-50/60 to-amber-100/50 border-amber-300/90 shadow-2xs hover:border-amber-400 hover:shadow-xs text-amber-950'
           }`}
+          title="Click to filter to Gold Deals (High Chance to Close)"
         >
-          <div className="flex items-center justify-between text-rose-700 mb-1">
-            <span className="text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Unplanned Stalled</span>
-            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 ml-1" />
+          <div className="flex items-center justify-between text-amber-800 mb-1">
+            <span className="text-[10.5px] sm:text-[11px] font-black uppercase tracking-wider truncate">Gold VIP Deals</span>
+            <Star className="h-4 w-4 fill-amber-400 text-amber-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg sm:text-2xl font-black text-rose-900 tracking-tight">{stats.urgentCount}</div>
-          <div className="flex items-center justify-between mt-1 text-[10.5px] sm:text-[11px] font-medium">
-            <span className="text-rose-600 truncate">&gt; 7d & no task</span>
-            {filter === 'urgent' ? (
-              <span className="text-[9.5px] sm:text-[10px] text-rose-800 font-bold bg-rose-200/80 px-1.5 py-0.5 rounded">Active</span>
+          <div className="text-lg sm:text-2xl font-black text-amber-950 tracking-tight font-mono">
+            {formattedGoldValue}
+          </div>
+          <div className="flex items-center justify-between mt-1 text-[10.5px] sm:text-[11px] font-medium text-amber-900">
+            <span className="font-bold">{stats.goldCount || 0} high chance</span>
+            {filter === 'gold' ? (
+              <span className="text-[9.5px] sm:text-[10px] text-amber-950 font-black bg-amber-300/90 px-1.5 py-0.5 rounded">Active</span>
             ) : (
-              <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition hidden sm:inline">Filter</span>
+              <span className="text-[9.5px] sm:text-[10px] text-amber-800 font-bold bg-amber-200/60 px-1.5 py-0.2 rounded">VIP</span>
             )}
           </div>
         </div>
 
-        {/* Warning / Follow-up Due */}
+        {/* 3. Action Due (Touch Required / Due Today) */}
         <div 
           onClick={() => toggle('warning')}
           className={`p-3 sm:p-4 rounded-xl border transition cursor-pointer select-none relative group active:scale-[0.99] ${
@@ -91,7 +102,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           </div>
           <div className="text-lg sm:text-2xl font-black text-amber-900 tracking-tight">{stats.warningCount}</div>
           <div className="flex items-center justify-between mt-1 text-[10.5px] sm:text-[11px] font-medium">
-            <span className="text-amber-700 truncate">Touch due</span>
+            <span className="text-amber-700 truncate">Touch required</span>
             {filter === 'warning' ? (
               <span className="text-[9.5px] sm:text-[10px] text-amber-800 font-bold bg-amber-200/80 px-1.5 py-0.5 rounded">Active</span>
             ) : (
@@ -100,7 +111,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           </div>
         </div>
 
-        {/* Planned Follow-ups / Scheduled */}
+        {/* 4. Planned (Scheduled Meetings & Future Tasks) */}
         <div 
           onClick={() => toggle('snoozed')}
           className={`p-3 sm:p-4 rounded-xl border transition cursor-pointer select-none relative group active:scale-[0.99] ${
@@ -126,7 +137,7 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           </div>
         </div>
 
-        {/* Active Rhythm (< 3 days) */}
+        {/* 5. In Momentum (Active Healthy Rhythm) */}
         <div 
           onClick={() => toggle('healthy')}
           className={`p-3 sm:p-4 rounded-xl border transition cursor-pointer select-none relative group active:scale-[0.99] ${
@@ -158,10 +169,10 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
             <Filter className="h-4 w-4 text-blue-600 shrink-0" />
             <span className="text-[11.5px] sm:text-xs">
               Filter:{' '}
-              <strong className="text-blue-950 font-bold capitalize">
-                {filter === 'urgent' && 'Unplanned Stalled (> 7d without scheduled task)'}
-                {filter === 'warning' && 'Action Due (due today or follow-up needed)'}
-                {filter === 'snoozed' && 'Planned Follow-up (future task scheduled)'}
+              <strong className="text-blue-950 font-bold">
+                {filter === 'gold' && `Gold VIP Deals (${stats.goldCount || 0} high-chance deals · ${formattedGoldValue})`}
+                {filter === 'warning' && 'Action Due (deals requiring immediate touchpoint or overdue task)'}
+                {filter === 'snoozed' && 'Planned Follow-up (future task or meeting scheduled)'}
                 {filter === 'healthy' && 'In Momentum (contacted recently or today)'}
               </strong>
             </span>

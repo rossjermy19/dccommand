@@ -335,8 +335,9 @@ export function StageBoard({
       if (!colId) return false;
 
       // KPI filter
+      if (activeFilter === 'gold' && !d.isGold && !d.tags?.includes('High Chance')) return false;
+      if (activeFilter === 'warning' && d.health !== 'warning' && d.health !== 'urgent') return false;
       if (activeFilter === 'urgent' && d.health !== 'urgent') return false;
-      if (activeFilter === 'warning' && d.health !== 'warning') return false;
       if (activeFilter === 'snoozed' && d.health !== 'snoozed') return false;
       if (activeFilter === 'healthy' && d.health !== 'healthy') return false;
 

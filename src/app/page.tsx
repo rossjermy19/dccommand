@@ -182,6 +182,27 @@ export default function DashboardPage() {
     return deals.filter((d) => d.health === 'urgent' || d.health === 'warning').length;
   }, [deals]);
 
+  // Dynamic KPI stats: reactive to deal updates and Gold VIP tags
+  const kpiStats = useMemo(() => {
+    const goldDeals = deals.filter((d) => d.isGold || d.tags?.includes('High Chance'));
+    const goldPipelineValue = goldDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+    const totalPipelineValue = deals.reduce((sum, d) => sum + (d.amount || 0), 0);
+    const actionDueCount = deals.filter((d) => d.health === 'warning' || d.health === 'urgent').length;
+    const snoozedCount = deals.filter((d) => d.health === 'snoozed').length;
+    const healthyCount = deals.filter((d) => d.health === 'healthy').length;
+
+    return {
+      totalDeals: deals.length,
+      totalPipelineValue: stats.totalPipelineValue || totalPipelineValue,
+      urgentCount: deals.filter((d) => d.health === 'urgent').length,
+      warningCount: actionDueCount,
+      healthyCount,
+      snoozedCount,
+      goldCount: goldDeals.length,
+      goldPipelineValue,
+    };
+  }, [deals, stats.totalPipelineValue]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <Navbar
@@ -222,7 +243,7 @@ export default function DashboardPage() {
           <>
             {/* Top Interactive KPI Tiles */}
             <KpiHeader
-              stats={stats}
+              stats={kpiStats}
               filter={activeFilter}
               onSelectFilter={(f) => {
                 setActiveFilter(f);

@@ -36,6 +36,9 @@ export function RadarView({
   // Apply Tag and Search filter
   const baseDeals = useMemo(() => {
     return deals.filter((d) => {
+      // KPI filter
+      if (activeFilter === 'gold' && !d.isGold && !d.tags?.includes('High Chance')) return false;
+
       // Dynamic Tag filter
       if (selectedTagFilter !== 'ALL') {
         const hasTag =
@@ -58,17 +61,17 @@ export function RadarView({
 
       return true;
     });
-  }, [deals, selectedTagFilter, searchQuery]);
+  }, [deals, activeFilter, selectedTagFilter, searchQuery]);
 
   const urgentDeals = useMemo(() => baseDeals.filter((d) => d.health === 'urgent'), [baseDeals]);
   const warningDeals = useMemo(() => baseDeals.filter((d) => d.health === 'warning'), [baseDeals]);
   const plannedDeals = useMemo(() => baseDeals.filter((d) => d.health === 'snoozed'), [baseDeals]);
   const healthyDeals = useMemo(() => baseDeals.filter((d) => d.health === 'healthy'), [baseDeals]);
 
-  const showUrgent = activeFilter === 'all' || activeFilter === 'urgent';
-  const showWarning = activeFilter === 'all' || activeFilter === 'warning';
-  const showPlanned = activeFilter === 'all' || activeFilter === 'snoozed';
-  const showHealthy = activeFilter === 'healthy';
+  const showUrgent = activeFilter === 'all' || activeFilter === 'urgent' || activeFilter === 'warning' || activeFilter === 'gold';
+  const showWarning = activeFilter === 'all' || activeFilter === 'warning' || activeFilter === 'gold';
+  const showPlanned = activeFilter === 'all' || activeFilter === 'snoozed' || activeFilter === 'gold';
+  const showHealthy = activeFilter === 'all' || activeFilter === 'healthy' || activeFilter === 'gold';
 
   return (
     <div className="space-y-6">
