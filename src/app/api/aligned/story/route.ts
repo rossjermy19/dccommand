@@ -22,9 +22,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If still empty, synthesize contextual notes from deal and client name so generation always succeeds
     if (!textToUse) {
-      textToUse = `Sales discovery and commercial discussion with ${clientName || dealName || 'the prospect'}. Discussion focused on Despatch Cloud multi-carrier shipping management, WMS warehouse workflows, and multi-channel order integration.`;
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'No transcript text was found. Please select a valid Fireflies recording or paste your call notes/transcript into the Paste tab.' 
+        }, 
+        { status: 400 }
+      );
     }
 
     const story = await generateAlignedStory(textToUse, dealName, clientName);

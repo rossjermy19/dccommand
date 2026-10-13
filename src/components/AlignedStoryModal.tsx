@@ -60,11 +60,19 @@ export function AlignedStoryModal({
     }
   }, [isOpen, transcriptSource]);
 
+  const [hasFirefliesApiKey, setHasFirefliesApiKey] = useState(true);
+
   const fetchFirefliesCalls = async () => {
     setLoadingFireflies(true);
     try {
       const res = await fetch('/api/fireflies/transcripts?limit=15');
       const data = await res.json();
+      if (data.hasApiKey !== undefined) {
+        setHasFirefliesApiKey(data.hasApiKey);
+        if (!data.hasApiKey) {
+          setTranscriptSource('paste');
+        }
+      }
       if (data.transcripts && data.transcripts.length > 0) {
         setFirefliesTranscripts(data.transcripts);
         
@@ -90,6 +98,17 @@ export function AlignedStoryModal({
 
   const handleGenerate = async () => {
     setError(null);
+
+    if (transcriptSource === 'paste' && (!pastedTranscript || pastedTranscript.trim().length < 30)) {
+      setError('Please paste your call transcript or meeting notes into the box below before generating.');
+      return;
+    }
+
+    if (transcriptSource === 'fireflies' && (!selectedTranscriptId || firefliesTranscripts.length === 0)) {
+      setError('No Fireflies call is available or selected. Please switch to the "Paste Call Transcript" tab.');
+      return;
+    }
+
     setGenerating(true);
     try {
       let transcriptText = pastedTranscript;
@@ -246,8 +265,15 @@ export function AlignedStoryModal({
                       Loading your Fireflies transcripts...
                     </div>
                   ) : firefliesTranscripts.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-center font-medium">
-                      No recent Fireflies transcripts found. Switch to &quot;Paste Call Transcript&quot;.
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 text-center font-medium space-y-1">
+                      <p className="font-bold">
+                        {!hasFirefliesApiKey
+                          ? 'FIREFLIES_API_KEY is not configured in .env'
+                          : 'No recent Fireflies calls found'}
+                      </p>
+                      <p className="text-[11px] text-amber-700">
+                        Switch to &quot;Paste Call Transcript&quot; tab to paste the meeting transcript directly.
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
