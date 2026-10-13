@@ -34,8 +34,9 @@ async function analyzeWithGemini(
   dealStage: string | undefined,
   apiKey: string
 ): Promise<TranscriptAnalysisResult> {
-  const prompt = `You are an elite B2B sales intelligence agent for Despatch Cloud (shipping, warehousing, multi-carrier management software).
-Analyze this call transcript for Deal: "${dealName || 'Unknown'}" (Stage: "${dealStage || 'Active'}").
+  const prompt = `You are an elite B2B sales intelligence agent for The Despatch Company (representing Voila and Neuro).
+Analyse this call transcript for Deal: "${dealName || 'Unknown'}" (Stage: "${dealStage || 'Active'}").
+Write all text strictly in British / UK English (e.g. prioritisation, optimisation, customised, fulfilment, centre). Never use American 'z' spellings where an 's' belongs.
 
 Transcript:
 ${transcript.slice(0, 15000)}
@@ -80,8 +81,9 @@ async function analyzeWithOpenAI(
   dealStage: string | undefined,
   apiKey: string
 ): Promise<TranscriptAnalysisResult> {
-  const prompt = `You are an elite B2B sales intelligence agent for Despatch Cloud.
-Analyze this call transcript for Deal: "${dealName || 'Unknown'}" (Stage: "${dealStage || 'Active'}").
+  const prompt = `You are an elite B2B sales intelligence agent for The Despatch Company (representing Voila and Neuro).
+Analyse this call transcript for Deal: "${dealName || 'Unknown'}" (Stage: "${dealStage || 'Active'}").
+Write all text strictly in British / UK English (e.g. prioritisation, optimisation, customised, fulfilment, centre). Never use American 'z' spellings where an 's' belongs.
 Return JSON matching:
 {
   "summary": "2-3 sentences recap",
@@ -155,10 +157,10 @@ function heuristicAnalysis(transcript: string, dealName?: string): TranscriptAna
     dcFit.push('Multi-Carrier Shipping Management');
   }
   if (lower.includes('barcode') || lower.includes('scanning') || lower.includes('picking')) {
-    dcFit.push('Barcode Scanning & Picking Optimization');
+    dcFit.push('Barcode Scanning & Picking Optimisation');
   }
   if (dcFit.length === 0) {
-    dcFit.push('Despatch Cloud Logistics & Order Processing Suite');
+    dcFit.push('The Despatch Company Logistics & Order Processing Suite');
   }
 
   // Commitments extraction
@@ -177,7 +179,7 @@ function heuristicAnalysis(transcript: string, dealName?: string): TranscriptAna
   });
 
   if (commitmentsRoss.length === 0) {
-    commitmentsRoss.push('Send summarized recap with tailored Despatch Cloud walkthrough');
+    commitmentsRoss.push('Send summarised recap with tailored walkthrough');
   }
   if (commitmentsClient.length === 0) {
     commitmentsClient.push('Review requirements with internal operations team');
@@ -193,7 +195,7 @@ function heuristicAnalysis(transcript: string, dealName?: string): TranscriptAna
   const clientName = dealName ? dealName.split('-')[0].trim() : 'Team';
 
   return {
-    summary: `Meeting held with ${clientName} reviewing logistical pain points and current fulfilment operations. Key interest centered on ${dcFit.join(', ')}. Next steps aligned around commercial proposal and technical scope.`,
+    summary: `Meeting held with ${clientName} reviewing logistical pain points and current fulfilment operations. Key interest centred on ${dcFit.join(', ')}. Next steps aligned around commercial proposal and technical scope.`,
     dealHealth: health,
     urgencyScore,
     buyingSignals: buyingSignals.length > 0 ? buyingSignals : ['Operational alignment established during discovery call'],

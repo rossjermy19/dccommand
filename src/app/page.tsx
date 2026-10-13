@@ -233,7 +233,7 @@ export default function DashboardPage() {
           <div className="py-24 text-center space-y-4">
             <RefreshCw className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
             <h3 className="text-base font-semibold text-slate-800">
-              Synchronizing with HubSpot CRM...
+              Synchronising with HubSpot CRM...
             </h3>
             <p className="text-xs text-slate-500">
               Fetching pipeline deals and associated touchpoints for Ross Jermy

@@ -118,7 +118,7 @@ export function TranscriptIntelligenceModal({
     setHubspotLogSuccess(false);
 
     try {
-      const res = await fetch('/api/analyze', {
+      const res = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +129,7 @@ export function TranscriptIntelligenceModal({
       });
 
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to analyze transcript');
+      if (!data.success) throw new Error(data.error || 'Failed to analyse transcript');
 
       setAnalysisResult(data.analysis);
     } catch (err: any) {
@@ -334,7 +334,7 @@ export function TranscriptIntelligenceModal({
                               className="flex items-center space-x-1.5 text-xs bg-white hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 px-3 py-1.5 rounded-lg transition"
                             >
                               <Sparkles className="h-3 w-3 text-blue-500 group-hover:text-white" />
-                              <span>{isLoadingThis ? 'Importing...' : 'Select & Analyze'}</span>
+                              <span>{isLoadingThis ? 'Importing...' : 'Select & Analyse'}</span>
                             </button>
                           </div>
                         );
@@ -375,7 +375,7 @@ export function TranscriptIntelligenceModal({
                       className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-md shadow-blue-500/20 disabled:opacity-50"
                     >
                       <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                      <span>{isAnalyzing ? 'Analyzing with Intelligence Engine...' : 'Run Intelligence Analysis'}</span>
+                      <span>{isAnalyzing ? 'Analysing with Intelligence Engine...' : 'Run Intelligence Analysis'}</span>
                     </button>
                   </div>
                 </div>
@@ -502,7 +502,7 @@ export function TranscriptIntelligenceModal({
                   }}
                   className="text-xs text-slate-500 hover:text-slate-800 font-medium"
                 >
-                  ← Analyze Another Meeting
+                  ← Analyse Another Meeting
                 </button>
 
                 <div className="flex items-center space-x-3 w-full sm:w-auto">

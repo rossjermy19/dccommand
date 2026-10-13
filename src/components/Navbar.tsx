@@ -59,8 +59,8 @@ export function Navbar({ onOpenTranscriptModal, onRefresh, isRefreshing }: Navba
             className="flex items-center space-x-1.5 sm:space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-2.5 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 transition active:scale-95 min-h-[36px]"
           >
             <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white shrink-0" />
-            <span className="hidden sm:inline">Analyze Meeting</span>
-            <span className="inline sm:hidden">Analyze</span>
+            <span className="hidden sm:inline">Analyse Meeting</span>
+            <span className="inline sm:hidden">Analyse</span>
           </button>
         </div>
       </div>

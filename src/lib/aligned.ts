@@ -201,7 +201,7 @@ async function callGemini(systemPrompt: string, transcript: string, apiKey: stri
                 role: 'user',
                 parts: [
                   { text: systemPrompt },
-                  { text: `\n\nCall Transcript to Analyze:\n${transcript}` },
+                  { text: `\n\nCall Transcript to Analyse:\n${transcript}` },
                 ],
               },
             ],
@@ -243,7 +243,7 @@ async function callOpenAI(systemPrompt: string, transcript: string, apiKey: stri
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Call Transcript to Analyze:\n${transcript}` },
+          { role: 'user', content: `Call Transcript to Analyse:\n${transcript}` },
         ],
         temperature: 0.25,
       }),
@@ -294,6 +294,6 @@ export async function generateAlignedStory(
 
   // If no LLM key is configured, inform the user clearly
   throw new Error(
-    'No AI API key found. Please add GEMINI_API_KEY or OPENAI_API_KEY to your .env file so the model can read and analyze the transcript.'
+    'No AI API key found. Please add GEMINI_API_KEY or OPENAI_API_KEY to your .env file so the model can read and analyse the transcript.'
   );
 }
