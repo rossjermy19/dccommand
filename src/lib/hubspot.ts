@@ -842,6 +842,36 @@ export async function updateDealSource(dealId: string, subSourceOrTag: string): 
   }
 }
 
+export async function updateDealCloseDate(dealId: string, closeDateIso: string): Promise<boolean> {
+  if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
+
+  try {
+    const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        properties: {
+          closedate: closeDateIso,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to update deal close date in HubSpot: ${errorText}`);
+      throw new Error(`Failed to update close date in HubSpot: ${errorText}`);
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error(`Error updating deal ${dealId} close date:`, err);
+    throw err;
+  }
+}
+
 export async function updateDealStage(
   dealId: string,
   stage: string,

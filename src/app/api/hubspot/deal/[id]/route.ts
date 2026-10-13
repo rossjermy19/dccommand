@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDealDetails, updateDealStage, updateDealSource } from '@/lib/hubspot';
+import { getDealDetails, updateDealStage, updateDealSource, updateDealCloseDate } from '@/lib/hubspot';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { stage, subSource, closedLostReason, closedLostNotes } = body;
+    const { stage, subSource, closedLostReason, closedLostNotes, closeDate } = body;
 
     if (stage) {
       await updateDealStage(dealId, stage, closedLostReason, closedLostNotes);
@@ -43,6 +43,10 @@ export async function PATCH(
 
     if (subSource !== undefined) {
       await updateDealSource(dealId, subSource);
+    }
+
+    if (closeDate !== undefined) {
+      await updateDealCloseDate(dealId, closeDate);
     }
 
     return NextResponse.json({ success: true });

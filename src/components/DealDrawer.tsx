@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PIPELINE_STAGES } from '@/lib/types';
 import { DealTagBadge } from './DealTagBadge';
+import { CloseMonthSelector } from './CloseMonthSelector';
 import { ClosedLostModal } from './ClosedLostModal';
 import { 
   X, 
@@ -436,6 +437,14 @@ export function DealDrawer({
                   </select>
                   {isUpdatingStage && <RefreshCw className="h-3 w-3 text-blue-600 animate-spin" />}
                 </div>
+
+                {/* Quick Close Month Selector */}
+                <CloseMonthSelector
+                  dealId={deal.id}
+                  closeDate={deal.closeDate}
+                  onUpdated={() => onRefreshDeals && onRefreshDeals()}
+                  variant="drawer"
+                />
 
                 <span className="text-xs sm:text-sm font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                   {formattedAmount}

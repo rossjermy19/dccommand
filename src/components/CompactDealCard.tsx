@@ -14,6 +14,7 @@ import {
   Star
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
+import { CloseMonthSelector } from './CloseMonthSelector';
 
 interface CompactDealCardProps {
   deal: Deal;
@@ -215,13 +216,13 @@ export function CompactDealCard({
         </div>
       </div>
 
-      {/* Tags / Origin Row */}
+      {/* Closing Month & Days Since Contact Row */}
       <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100">
-        <DealTagBadge
+        <CloseMonthSelector
           dealId={deal.id}
-          tags={deal.tags}
-          subSource={deal.subSource}
-          onTagUpdated={onTagUpdated}
+          closeDate={deal.closeDate}
+          onUpdated={() => onTagUpdated && onTagUpdated()}
+          variant="card"
         />
         
         {/* Days since contact */}
@@ -234,6 +235,16 @@ export function CompactDealCard({
             'No touch'
           )}
         </span>
+      </div>
+
+      {/* Tags / Origin Row */}
+      <div className="flex items-center justify-start gap-1">
+        <DealTagBadge
+          dealId={deal.id}
+          tags={deal.tags}
+          subSource={deal.subSource}
+          onTagUpdated={onTagUpdated}
+        />
       </div>
 
       {/* Context 1-liner */}
