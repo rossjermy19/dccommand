@@ -208,7 +208,7 @@ export function AlignedStoryModal({
                 </span>
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Turn your call into the 4-part executive story ready to paste into Aligned.so
+                Turn your call into a tailored executive story ready to paste into TeamAligned
               </p>
             </div>
           </div>
@@ -425,12 +425,12 @@ export function AlignedStoryModal({
                 </div>
 
                 <a
-                  href="https://app.aligned.so"
+                  href="https://thedespatchcompany.teamaligned.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center space-x-1 text-slate-500 hover:text-slate-800 text-xs font-medium transition"
+                  className="flex items-center justify-center space-x-1 text-indigo-600 hover:text-indigo-800 text-xs font-semibold transition"
                 >
-                  <span>Open Aligned.so</span>
+                  <span>Open TeamAligned</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
