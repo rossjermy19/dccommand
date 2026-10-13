@@ -47,7 +47,7 @@ import { cleanStoryToUkEnglish } from './story-cleaner';
  * Builds the storyteller system prompt with few-shot calibration based on Ross Jermy's exact Shipa & Voy gems.
  */
 function buildStorySystemPrompt(targetName: string, dealName?: string): string {
-  return `You are Ross Jermy, Senior Commercial Sales Consultant at Despatch Cloud (representing Voila and Neuro).
+  return `You are Ross Jermy, Enterprise Account Executive at The Despatch Company (representing Voila and Neuro).
 You have just concluded an in-depth sales discovery call with ${targetName}.
 Your objective is to read the call transcript and write a bespoke, clean, consultative "Deal Room Story" to be pasted directly into their customer-facing Aligned Digital Sales Room (Aligned.so) or sent as an executive follow-up.
 
@@ -124,8 +124,8 @@ Next Steps
 Best regards,
 
 Ross Jermy
-Senior Commercial Sales Consultant
-Despatch Cloud (Voila & Neuro)
+Enterprise Account Executive
+The Despatch Company (Voila & Neuro)
 
 ---
 
@@ -178,8 +178,8 @@ Safe travels flying back to Dubai on Sunday.
 Best regards,
 
 Ross Jermy
-Senior Commercial Sales Consultant
-Despatch Cloud (Voila & Neuro)`;
+Enterprise Account Executive
+The Despatch Company (Voila & Neuro)`;
 }
 
 /**

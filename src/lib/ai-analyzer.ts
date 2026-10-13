@@ -206,7 +206,7 @@ function heuristicAnalysis(transcript: string, dealName?: string): TranscriptAna
     recommendedNextAction: `Send structured follow-up email outlining the discussed Despatch Cloud solution and confirm target go-live date.`,
     suggestedFollowUpEmail: {
       subject: `Great speaking today - Despatch Cloud next steps for ${clientName}`,
-      body: `Hi there,\n\nThank you for the time today. It was great learning more about your current operational setup and where you're looking to streamline fulfilment.\n\nTo recap what we covered:\n• Addressed your core priorities around ${dcFit.slice(0, 2).join(' and ')}\n• Clarified next steps regarding internal review\n\nAs promised, I'll follow up with the requested details. In the meantime, please let me know if any questions come up from your side.\n\nBest regards,\nRoss Jermy\nDespatch Cloud`,
+      body: `Hi there,\n\nThank you for the time today. It was great learning more about your current operational setup and where you're looking to streamline fulfilment.\n\nTo recap what we covered:\n• Addressed your core priorities around ${dcFit.slice(0, 2).join(' and ')}\n• Clarified next steps regarding internal review\n\nAs promised, I'll follow up with the requested details. In the meantime, please let me know if any questions come up from your side.\n\nBest regards,\nRoss Jermy\nEnterprise Account Executive\nThe Despatch Company (Voila & Neuro)`,
     },
   };
 }

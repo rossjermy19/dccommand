@@ -54,8 +54,8 @@ export function FollowUpModal({ deal, onClose, onLogNote }: FollowUpModalProps) 
     : `Checking in - Despatch Cloud & ${deal.name.split('-')[0].trim()}`;
 
   const defaultBody = isPostMeeting
-    ? `Hi ${prospectName},\n\nI wanted to follow up following our recent discussion regarding your shipping and fulfillment operations.\n\nHave you had the opportunity to review the points we covered around Despatch Cloud's integration capabilities?\n\nHappy to jump on a quick 10-minute touchpoint this week to answer any questions or share the commercial proposal.\n\nBest regards,\nRoss Jermy\nDespatch Cloud`
-    : `Hi ${prospectName},\n\nI hope you're having a productive week.\n\nI'm following up on our active thread regarding Despatch Cloud. Given your current order volumes and carrier setup, I wanted to check whether you've had a chance to evaluate the next steps for your operations.\n\nLet me know what day works best for a brief catch-up.\n\nBest regards,\nRoss Jermy\nDespatch Cloud`;
+    ? `Hi ${prospectName},\n\nI wanted to follow up following our recent discussion regarding your shipping and fulfilment operations.\n\nHave you had the opportunity to review the points we covered around our integration capabilities?\n\nHappy to jump on a quick 10-minute touchpoint this week to answer any questions or share the commercial proposal.\n\nBest regards,\nRoss Jermy\nEnterprise Account Executive\nThe Despatch Company (Voila & Neuro)`
+    : `Hi ${prospectName},\n\nI hope you're having a productive week.\n\nI'm following up on our active thread regarding our logistics tech. Given your current order volumes and carrier setup, I wanted to check whether you've had a chance to evaluate the next steps for your operations.\n\nLet me know what day works best for a brief catch-up.\n\nBest regards,\nRoss Jermy\nEnterprise Account Executive\nThe Despatch Company (Voila & Neuro)`;
 
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
