@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Deal } from '@/lib/types';
+import { cleanStoryToUkEnglish } from '@/lib/story-cleaner';
 import { 
   X, 
   Sparkles, 
@@ -44,7 +45,7 @@ export function AlignedStoryModal({
   // If deal already has an aligned story, load it directly!
   useEffect(() => {
     if (deal?.alignedStory) {
-      setStory(deal.alignedStory);
+      setStory(cleanStoryToUkEnglish(deal.alignedStory));
     } else {
       setStory('');
     }
@@ -363,9 +364,25 @@ export function AlignedStoryModal({
                 </button>
               </div>
 
-              {/* Story Output Display */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-sans text-slate-800 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto select-all">
-                {story}
+              {/* Story Output Display & Editor */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-0.5">
+                  <span>Story Text (UK English • Clean Formatting)</span>
+                  <button
+                    type="button"
+                    onClick={() => setStory(cleanStoryToUkEnglish(story))}
+                    className="text-indigo-600 hover:text-indigo-800 transition"
+                  >
+                    Clean formatting & UK English
+                  </button>
+                </div>
+                <textarea
+                  value={story}
+                  onChange={(e) => setStory(e.target.value)}
+                  rows={15}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-sans text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white leading-relaxed resize-y select-text shadow-2xs"
+                  placeholder="Your bespoke Aligned story..."
+                />
               </div>
 
               {/* Action Buttons */}
@@ -383,7 +400,7 @@ export function AlignedStoryModal({
                     ) : (
                       <>
                         <Copy className="h-4 w-4" />
-                        <span>Copy for Aligned Room</span>
+                        <span>Copy Clean Story</span>
                       </>
                     )}
                   </button>
