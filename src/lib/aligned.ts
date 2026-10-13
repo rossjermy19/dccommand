@@ -170,7 +170,7 @@ Best regards,
  * Calls Gemini models (gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro).
  */
 async function callGemini(systemPrompt: string, transcript: string, apiKey: string): Promise<string | null> {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 
   for (const model of models) {
     try {
