@@ -6,6 +6,7 @@ export interface SourceOption {
 }
 
 export const SOURCE_OPTIONS: SourceOption[] = [
+  { label: 'Aligned Room', value: 'Aligned Room', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { label: 'Back with Liberty J', value: 'Back with Liberty J', badgeColor: 'bg-teal-50 text-teal-800 border-teal-300' },
   { label: 'Liberty J', value: 'Liberty Jai', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { label: 'Partnerships - Evri', value: 'Partnerships - Evri', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200' },

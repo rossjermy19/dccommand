@@ -135,6 +135,38 @@ export function DealDrawer({
     setIsGold(!!deal?.isGold);
   }, [deal?.isGold]);
 
+  const [hasAlignedRoom, setHasAlignedRoom] = useState(!!deal?.hasAlignedRoom);
+  const [isTogglingAlignedRoom, setIsTogglingAlignedRoom] = useState(false);
+
+  useEffect(() => {
+    setHasAlignedRoom(!!deal?.hasAlignedRoom);
+  }, [deal?.hasAlignedRoom]);
+
+  const handleToggleAlignedRoom = async () => {
+    if (!deal || isTogglingAlignedRoom) return;
+    const nextState = !hasAlignedRoom;
+    setHasAlignedRoom(nextState);
+    setIsTogglingAlignedRoom(true);
+
+    try {
+      const res = await fetch(`/api/hubspot/deal/${deal.id}/aligned-room`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hasAlignedRoom: nextState, dealName: deal.name }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setHasAlignedRoom(!nextState); // rollback
+      } else {
+        if (onRefreshDeals) onRefreshDeals();
+      }
+    } catch (e) {
+      setHasAlignedRoom(!nextState); // rollback
+    } finally {
+      setIsTogglingAlignedRoom(false);
+    }
+  };
+
   const handleToggleGold = async () => {
     if (!deal || isTogglingGold) return;
     const nextGold = !isGold;
@@ -491,6 +523,45 @@ export function DealDrawer({
                 </div>
               )}
 
+              {/* Aligned Room Status Banner */}
+              {hasAlignedRoom && (
+                <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/5 border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                      <Presentation className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-indigo-950 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                        <span>Aligned Deal Room Set Up</span>
+                        <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded border border-indigo-200">
+                          Active
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-indigo-700 font-medium">
+                        Digital deal room created for this prospect on TeamAligned.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <a
+                      href="https://thedespatchcompany.teamaligned.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg transition"
+                    >
+                      Open TeamAligned ↗
+                    </a>
+                    <button
+                      onClick={handleToggleAlignedRoom}
+                      disabled={isTogglingAlignedRoom}
+                      className="px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-rose-600 rounded-lg transition"
+                    >
+                      Unmark
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {deal.isBackWithLibertyJ && (
                 <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
                   <div className="flex items-center space-x-2.5">
@@ -525,6 +596,40 @@ export function DealDrawer({
             </div>
 
             <div className="flex items-center space-x-1 flex-shrink-0">
+              {/* Aligned Room Toggle Button */}
+              <button
+                type="button"
+                onClick={handleToggleAlignedRoom}
+                disabled={isTogglingAlignedRoom}
+                title={
+                  hasAlignedRoom
+                    ? 'Aligned Room Set Up (Click to remove)'
+                    : 'Touch to mark Aligned Room as set up'
+                }
+                className={`p-2 rounded-lg transition min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                  hasAlignedRoom
+                    ? 'text-indigo-700 bg-indigo-100 hover:bg-indigo-200 ring-1 ring-indigo-300 shadow-2xs'
+                    : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                }`}
+              >
+                <Presentation className={`h-4 w-4 ${hasAlignedRoom ? 'fill-indigo-300 text-indigo-700' : ''}`} />
+              </button>
+
+              {/* Gold Star Toggle Button */}
+              <button
+                type="button"
+                onClick={handleToggleGold}
+                disabled={isTogglingGold}
+                title={isGold ? 'Gold VIP (High Chance to Close) — Click to remove' : 'Mark as Gold VIP'}
+                className={`p-2 rounded-lg transition min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                  isGold
+                    ? 'text-amber-700 bg-amber-100 hover:bg-amber-200 ring-1 ring-amber-300 shadow-2xs'
+                    : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
+                }`}
+              >
+                <Star className={`h-4 w-4 ${isGold ? 'fill-amber-400 text-amber-500' : ''}`} />
+              </button>
+
               <a
                 href={deal.hubspotUrl}
                 target="_blank"

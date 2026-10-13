@@ -84,6 +84,8 @@ export interface Deal {
   daysWithLibertyJ?: number | null;
   isGold?: boolean;
   goldDate?: string | null;
+  hasAlignedRoom?: boolean;
+  alignedRoomDate?: string | null;
 }
 
 export interface PipelineStage {

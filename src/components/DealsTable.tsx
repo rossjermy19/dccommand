@@ -13,7 +13,8 @@ import {
   Clock, 
   Calendar,
   Star,
-  Bot
+  Bot,
+  Presentation
 } from 'lucide-react';
 
 interface DealsTableProps {
@@ -61,6 +62,7 @@ export function DealsTable({
         if (selectedTagFilter && selectedTagFilter !== 'ALL') {
           const hasTag =
             (selectedTagFilter === 'High Chance' && (d.isGold || d.tags?.includes('High Chance'))) ||
+            (selectedTagFilter === 'Aligned Room' && (d.hasAlignedRoom || d.tags?.includes('Aligned Room'))) ||
             d.tags?.includes(selectedTagFilter) ||
             d.source === selectedTagFilter ||
             d.subSource === selectedTagFilter;
@@ -181,6 +183,12 @@ export function DealsTable({
                             ⭐ Gold
                           </span>
                         )}
+                        {deal.hasAlignedRoom && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                            <Presentation className="h-2.5 w-2.5 text-indigo-600" />
+                            Aligned Room
+                          </span>
+                        )}
                         <span>{deal.name}</span>
                         <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-70 transition text-slate-400" />
                       </div>
@@ -255,6 +263,31 @@ export function DealsTable({
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1.5 sm:space-x-2">
+                        {/* Aligned Room Toggle Button */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await fetch(`/api/hubspot/deal/${deal.id}/aligned-room`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ hasAlignedRoom: !deal.hasAlignedRoom, dealName: deal.name }),
+                              });
+                              if (onTagUpdated) onTagUpdated();
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          title={deal.hasAlignedRoom ? 'Aligned Room Set Up — Click to unmark' : 'Touch to mark Aligned Room set up'}
+                          className={`p-1.5 rounded-lg transition ${
+                            deal.hasAlignedRoom
+                              ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 ring-1 ring-indigo-300'
+                              : 'bg-slate-100 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
+                          }`}
+                        >
+                          <Presentation className={`h-3.5 w-3.5 ${deal.hasAlignedRoom ? 'fill-indigo-300 text-indigo-700' : ''}`} />
+                        </button>
+
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();

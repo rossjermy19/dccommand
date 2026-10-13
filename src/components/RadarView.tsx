@@ -43,6 +43,7 @@ export function RadarView({
       if (selectedTagFilter !== 'ALL') {
         const hasTag =
           (selectedTagFilter === 'High Chance' && (d.isGold || d.tags?.includes('High Chance'))) ||
+          (selectedTagFilter === 'Aligned Room' && (d.hasAlignedRoom || d.tags?.includes('Aligned Room'))) ||
           d.tags?.includes(selectedTagFilter) ||
           d.source === selectedTagFilter ||
           d.subSource === selectedTagFilter;

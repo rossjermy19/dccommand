@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAlignedStory, saveAlignedStory, getAlignedStoriesMap } from '@/lib/aligned';
+import { saveAlignedRoom } from '@/lib/aligned-rooms';
 import { fetchTranscriptDetails } from '@/lib/fireflies';
 
 export async function POST(req: NextRequest) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     if (dealId) {
       saveAlignedStory(dealId, story, firefliesTranscriptId);
+      await saveAlignedRoom(dealId, true, dealName);
     }
 
     return NextResponse.json({ success: true, story });

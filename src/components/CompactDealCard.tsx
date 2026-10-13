@@ -35,10 +35,43 @@ export function CompactDealCard({
 }: CompactDealCardProps) {
   const [isGold, setIsGold] = useState(!!deal.isGold);
   const [isTogglingGold, setIsTogglingGold] = useState(false);
+  const [hasAlignedRoom, setHasAlignedRoom] = useState(!!deal.hasAlignedRoom);
+  const [isTogglingAlignedRoom, setIsTogglingAlignedRoom] = useState(false);
 
   useEffect(() => {
     setIsGold(!!deal.isGold);
   }, [deal.isGold]);
+
+  useEffect(() => {
+    setHasAlignedRoom(!!deal.hasAlignedRoom);
+  }, [deal.hasAlignedRoom]);
+
+  const handleToggleAlignedRoom = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isTogglingAlignedRoom) return;
+
+    const nextState = !hasAlignedRoom;
+    setHasAlignedRoom(nextState);
+    setIsTogglingAlignedRoom(true);
+
+    try {
+      const res = await fetch(`/api/hubspot/deal/${deal.id}/aligned-room`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hasAlignedRoom: nextState, dealName: deal.name }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setHasAlignedRoom(!nextState); // rollback
+      } else {
+        if (onTagUpdated) onTagUpdated();
+      }
+    } catch (err) {
+      setHasAlignedRoom(!nextState); // rollback
+    } finally {
+      setIsTogglingAlignedRoom(false);
+    }
+  };
 
   const handleToggleGold = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -127,6 +160,8 @@ export function CompactDealCard({
           ? 'border-amber-400 bg-gradient-to-br from-amber-50/95 via-yellow-50/70 to-amber-100/60 ring-2 ring-amber-400/60 shadow-md shadow-amber-500/20 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/30'
           : deal.isBackWithLibertyJ
           ? 'bg-white hover:bg-slate-50/50 border-teal-300 hover:border-teal-400 ring-1 ring-teal-200/50'
+          : hasAlignedRoom
+          ? 'bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300 border-l-[3.5px] border-l-indigo-600 ring-1 ring-indigo-200/50 shadow-xs'
           : 'bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300'
       }`}
     >
@@ -160,7 +195,7 @@ export function CompactDealCard({
         </div>
       )}
 
-      {/* Top Header: Title & HubSpot link & Gold Star toggle */}
+      {/* Top Header: Title & HubSpot link & Aligned Room toggle & Gold Star toggle */}
       <div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center space-x-1.5 min-w-0 flex-1">
@@ -177,6 +212,30 @@ export function CompactDealCard({
             </h4>
           </div>
           <div className="flex items-center space-x-0.5 -mr-1 shrink-0">
+            {/* Aligned Room Toggle Symbol */}
+            <button
+              type="button"
+              onClick={handleToggleAlignedRoom}
+              disabled={isTogglingAlignedRoom}
+              title={
+                hasAlignedRoom
+                  ? 'Aligned Room Set Up (Click to remove)'
+                  : 'Touch to mark Aligned Room as set up'
+              }
+              className={`p-1 rounded-md transition ${
+                hasAlignedRoom
+                  ? 'text-indigo-700 bg-indigo-100 hover:bg-indigo-200 ring-1 ring-indigo-300 shadow-2xs'
+                  : 'text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'
+              }`}
+            >
+              <Presentation
+                className={`h-3.5 w-3.5 ${
+                  hasAlignedRoom ? 'fill-indigo-300 text-indigo-700' : ''
+                }`}
+              />
+            </button>
+
+            {/* Gold Star */}
             <button
               type="button"
               onClick={handleToggleGold}
@@ -238,7 +297,21 @@ export function CompactDealCard({
       </div>
 
       {/* Tags / Origin Row */}
-      <div className="flex items-center justify-start gap-1">
+      <div className="flex flex-wrap items-center justify-start gap-1">
+        {hasAlignedRoom && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenAlignedModal) onOpenAlignedModal(deal);
+            }}
+            title="Aligned Deal Room is set up — Click to view story / launch TeamAligned"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-2xs"
+          >
+            <Presentation className="h-3 w-3 text-indigo-600 fill-indigo-200 shrink-0" />
+            <span>Aligned Room</span>
+          </button>
+        )}
         <DealTagBadge
           dealId={deal.id}
           tags={deal.tags}
@@ -266,9 +339,17 @@ export function CompactDealCard({
                 onOpenAlignedModal(deal);
               }}
               title="Aligned Deal Room Story (Pitch & Deck)"
-              className="p-1 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition"
+              className={`p-1 rounded transition ${
+                hasAlignedRoom
+                  ? 'bg-indigo-100 text-indigo-700 font-bold hover:bg-indigo-200'
+                  : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
+              }`}
             >
-              <Presentation className="h-3.5 w-3.5" />
+              <Presentation
+                className={`h-3.5 w-3.5 ${
+                  hasAlignedRoom ? 'fill-indigo-300 text-indigo-700' : ''
+                }`}
+              />
             </button>
           )}
           <button

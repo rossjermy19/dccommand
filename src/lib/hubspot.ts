@@ -3,6 +3,7 @@ import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
 import { syncGoldDealsFromHubSpot } from './gold-deals';
+import { syncAlignedRoomsFromHubSpot } from './aligned-rooms';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -284,6 +285,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
   const alignedStoriesMap = getAlignedStoriesMap();
   const libertyJMap = await syncLibertyJStatusFromHubSpot();
   const goldDealsMap = await syncGoldDealsFromHubSpot();
+  const alignedRoomsMap = await syncAlignedRoomsFromHubSpot();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};
@@ -299,6 +301,15 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const isGold = !!(goldRecord?.isGold || customTags.includes('High Chance') || customTags.includes('Gold'));
     const goldDate = goldRecord?.date || null;
 
+    // Aligned Room Tracking (TeamAligned Digital Sales Room)
+    const alignedRoomRecord = alignedRoomsMap[item.id];
+    const hasAlignedRoom = !!(
+      alignedRoomRecord?.hasAlignedRoom ||
+      customTags.includes('Aligned Room') ||
+      alignedStoryRecord
+    );
+    const alignedRoomDate = alignedRoomRecord?.date || null;
+
     // Liberty J Status Tracking
     const libertyJRecord = libertyJMap[item.id];
     const isBackWithLibertyJ = !!(libertyJRecord?.isBackWithLibertyJ || customTags.includes('Back with Liberty J'));
@@ -313,12 +324,13 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
     const tagsSet = new Set<string>();
     if (isGold) tagsSet.add('High Chance');
+    if (hasAlignedRoom) tagsSet.add('Aligned Room');
     if (isLibertyJSource) tagsSet.add('Liberty J');
     if (isBackWithLibertyJ) tagsSet.add('Back with Liberty J');
     if (rawSubSource && rawSubSource !== 'Liberty Jai') tagsSet.add(rawSubSource);
     if (rawSource) tagsSet.add(rawSource);
     customTags.forEach((t) => {
-      if (!/libby|liberty/i.test(t) && t !== 'Back with Liberty J' && t !== 'High Chance') tagsSet.add(t);
+      if (!/libby|liberty/i.test(t) && t !== 'Back with Liberty J' && t !== 'High Chance' && t !== 'Aligned Room') tagsSet.add(t);
     });
     const tags = Array.from(tagsSet);
 
@@ -478,6 +490,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
       daysWithLibertyJ,
       isGold,
       goldDate,
+      hasAlignedRoom,
+      alignedRoomDate,
     };
   });
 }
