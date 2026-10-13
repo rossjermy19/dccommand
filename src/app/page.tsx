@@ -25,7 +25,8 @@ import {
   Sparkles,
   Filter,
   Zap,
-  Target
+  Target,
+  Presentation
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -175,6 +176,11 @@ export default function DashboardPage() {
   // Compute Gold deals count for quick filter button
   const goldDealsCount = useMemo(() => {
     return deals.filter((d) => d.isGold || d.tags?.includes('High Chance')).length;
+  }, [deals]);
+
+  // Compute Aligned Rooms count for quick filter button
+  const alignedRoomsCount = useMemo(() => {
+    return deals.filter((d) => d.hasAlignedRoom || d.tags?.includes('Aligned Room')).length;
   }, [deals]);
 
   // Compute pending missions count for the badge
@@ -350,7 +356,7 @@ export default function DashboardPage() {
                   <div className="relative flex items-center shrink-0">
                     <select
                       value={
-                        selectedTagFilter === 'Liberty J' || selectedTagFilter === 'High Chance'
+                        selectedTagFilter === 'Liberty J' || selectedTagFilter === 'High Chance' || selectedTagFilter === 'Aligned Room'
                           ? 'ALL'
                           : selectedTagFilter
                       }
@@ -387,6 +393,27 @@ export default function DashboardPage() {
                       selectedTagFilter === 'High Chance' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-100 text-amber-900'
                     }`}>
                       {goldDealsCount}
+                    </span>
+                  </button>
+
+                  {/* 1-Click Tag Filter: Aligned Rooms */}
+                  <button
+                    onClick={() =>
+                      setSelectedTagFilter(selectedTagFilter === 'Aligned Room' ? 'ALL' : 'Aligned Room')
+                    }
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border shadow-2xs shrink-0 ${
+                      selectedTagFilter === 'Aligned Room'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
+                        : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                    }`}
+                    title="Filter to deals with an Aligned Deal Room set up"
+                  >
+                    <Presentation className="h-3.5 w-3.5" />
+                    <span>Aligned Rooms</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      selectedTagFilter === 'Aligned Room' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-700'
+                    }`}>
+                      {alignedRoomsCount}
                     </span>
                   </button>
 
