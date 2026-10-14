@@ -47,7 +47,14 @@ export const STAGE_LABELS: Record<string, string> = {
   '5536133318': 'Back Burner',
 };
 
+let cachedStagesMap: Record<string, string> | null = null;
+let stagesLastFetched = 0;
+const STAGES_CACHE_TTL = 3600 * 1000; // 1 hour
+
 export async function fetchPipelineStages(): Promise<Record<string, string>> {
+  if (cachedStagesMap && Date.now() - stagesLastFetched < STAGES_CACHE_TTL) {
+    return cachedStagesMap;
+  }
   if (!TOKEN) return STAGE_LABELS;
   try {
     const res = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/pipelines/deals`, {
@@ -55,9 +62,8 @@ export async function fetchPipelineStages(): Promise<Record<string, string>> {
         Authorization: `Bearer ${TOKEN}`,
         'Content-Type': 'application/json',
       },
-      next: { revalidate: 3600 },
     });
-    if (!res.ok) return STAGE_LABELS;
+    if (!res.ok) return cachedStagesMap || STAGE_LABELS;
     const data = await res.json();
     const map: Record<string, string> = { ...STAGE_LABELS };
     data.results?.forEach((pipe: any) => {
@@ -65,19 +71,19 @@ export async function fetchPipelineStages(): Promise<Record<string, string>> {
         map[stage.id] = stage.label;
       });
     });
+    cachedStagesMap = map;
+    stagesLastFetched = Date.now();
     return map;
   } catch (err) {
     console.error('Error fetching pipeline stages:', err);
-    return STAGE_LABELS;
+    return cachedStagesMap || STAGE_LABELS;
   }
 }
 
 export async function getOpenDeals(): Promise<Deal[]> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
-  const stageLabels = await fetchPipelineStages();
-
-  const body = {
+  const searchBody = {
     filters: [
       {
         propertyName: 'hubspot_owner_id',
@@ -133,15 +139,22 @@ export async function getOpenDeals(): Promise<Deal[]> {
     ],
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-    cache: 'no-store',
-  });
+  // Wave 1: Simultaneously execute deals search, stage lookup, and all status synchronisations
+  const [stageLabels, response, libertyJMap, goldDealsMap, alignedRoomsMap] = await Promise.all([
+    fetchPipelineStages(),
+    fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(searchBody),
+      cache: 'no-store',
+    }),
+    syncLibertyJStatusFromHubSpot(),
+    syncGoldDealsFromHubSpot(),
+    syncAlignedRoomsFromHubSpot(),
+  ]);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -175,29 +188,53 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
   try {
     if (rawDeals.length > 0) {
-      // 1. Fetch Task Associations
-      const assocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
-      });
-      if (assocRes.ok) {
-        const assocData = await assocRes.json();
-        const allTaskInputs: { id: string }[] = [];
-        const taskToDealMap: Record<string, string> = {};
+      // Wave 2: Concurrently fetch task associations and meeting associations
+      const [assocRes, meetingAssocRes] = await Promise.all([
+        fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
+        }),
+        fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/meetings/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
+        }),
+      ]);
 
-        (assocData.results || []).forEach((r: any) => {
-          const dealId = r.from.id;
-          (r.to || []).forEach((t: any) => {
-            const taskId = t.toObjectId.toString();
-            allTaskInputs.push({ id: taskId });
-            taskToDealMap[taskId] = dealId;
-          });
+      const [assocData, meetingAssocData] = await Promise.all([
+        assocRes.ok ? assocRes.json() : { results: [] },
+        meetingAssocRes.ok ? meetingAssocRes.json() : { results: [] },
+      ]);
+
+      const allTaskInputs: { id: string }[] = [];
+      const taskToDealMap: Record<string, string> = {};
+      (assocData.results || []).forEach((r: any) => {
+        const dealId = r.from.id;
+        (r.to || []).forEach((t: any) => {
+          const taskId = t.toObjectId.toString();
+          allTaskInputs.push({ id: taskId });
+          taskToDealMap[taskId] = dealId;
         });
+      });
 
-        if (allTaskInputs.length > 0) {
-          for (let i = 0; i < allTaskInputs.length; i += 100) {
-            const chunk = allTaskInputs.slice(i, i + 100);
+      const allMeetingInputs: { id: string }[] = [];
+      const meetingToDealMap: Record<string, string> = {};
+      (meetingAssocData.results || []).forEach((r: any) => {
+        const dealId = r.from.id;
+        (r.to || []).forEach((m: any) => {
+          const mId = m.toObjectId.toString();
+          allMeetingInputs.push({ id: mId });
+          meetingToDealMap[mId] = dealId;
+        });
+      });
+
+      // Wave 3: Concurrently fetch all task chunks AND all meeting chunks in parallel
+      const taskBatchPromises: Promise<void>[] = [];
+      for (let i = 0; i < allTaskInputs.length; i += 100) {
+        const chunk = allTaskInputs.slice(i, i + 100);
+        taskBatchPromises.push(
+          (async () => {
             const tasksRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
@@ -225,33 +262,15 @@ export async function getOpenDeals(): Promise<Deal[]> {
                 }
               });
             }
-          }
-        }
+          })()
+        );
       }
 
-      // 2. Fetch Meeting Associations
-      const meetingAssocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/meetings/batch/read`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
-      });
-      if (meetingAssocRes.ok) {
-        const meetingAssocData = await meetingAssocRes.json();
-        const allMeetingInputs: { id: string }[] = [];
-        const meetingToDealMap: Record<string, string> = {};
-
-        (meetingAssocData.results || []).forEach((r: any) => {
-          const dealId = r.from.id;
-          (r.to || []).forEach((m: any) => {
-            const mId = m.toObjectId.toString();
-            allMeetingInputs.push({ id: mId });
-            meetingToDealMap[mId] = dealId;
-          });
-        });
-
-        if (allMeetingInputs.length > 0) {
-          for (let i = 0; i < allMeetingInputs.length; i += 100) {
-            const chunk = allMeetingInputs.slice(i, i + 100);
+      const meetingBatchPromises: Promise<void>[] = [];
+      for (let i = 0; i < allMeetingInputs.length; i += 100) {
+        const chunk = allMeetingInputs.slice(i, i + 100);
+        meetingBatchPromises.push(
+          (async () => {
             const meetingsRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
@@ -279,9 +298,11 @@ export async function getOpenDeals(): Promise<Deal[]> {
                 }
               });
             }
-          }
-        }
+          })()
+        );
       }
+
+      await Promise.all([...taskBatchPromises, ...meetingBatchPromises]);
     }
   } catch (err) {
     console.warn('Failed to batch fetch tasks/meetings for deals:', err);
@@ -289,9 +310,6 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
   const customTagsMap = getCustomTagsMap();
   const alignedStoriesMap = getAlignedStoriesMap();
-  const libertyJMap = await syncLibertyJStatusFromHubSpot();
-  const goldDealsMap = await syncGoldDealsFromHubSpot();
-  const alignedRoomsMap = await syncAlignedRoomsFromHubSpot();
 
   return rawDeals.map((item: any): Deal => {
     const props = item.properties || {};

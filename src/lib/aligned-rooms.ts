@@ -13,11 +13,17 @@ export interface AlignedRoomRecord {
   dealName?: string;
 }
 
+let cachedAlignedRoomsMap: Record<string, AlignedRoomRecord> | null = null;
+let lastAlignedRoomsSyncTime = 0;
+const ALIGNED_ROOMS_SYNC_CACHE_TTL = 60_000; // 60 seconds
+
 export function getAlignedRoomsMap(): Record<string, AlignedRoomRecord> {
+  if (cachedAlignedRoomsMap) return cachedAlignedRoomsMap;
   try {
     if (fs.existsSync(ALIGNED_ROOMS_FILE)) {
       const data = fs.readFileSync(ALIGNED_ROOMS_FILE, 'utf-8');
-      return JSON.parse(data);
+      cachedAlignedRoomsMap = JSON.parse(data);
+      return cachedAlignedRoomsMap || {};
     }
   } catch (err) {
     console.error('Error reading aligned rooms file:', err);
@@ -27,99 +33,107 @@ export function getAlignedRoomsMap(): Record<string, AlignedRoomRecord> {
 
 /**
  * Synchronises Aligned Room status with HubSpot CRM notes.
- * This ensures status survives Railway container restarts and redeployments permanently.
+ * Executes search and association queries concurrently and caches in memory.
  */
-export async function syncAlignedRoomsFromHubSpot(): Promise<Record<string, AlignedRoomRecord>> {
+export async function syncAlignedRoomsFromHubSpot(force = false): Promise<Record<string, AlignedRoomRecord>> {
+  if (!force && cachedAlignedRoomsMap && Date.now() - lastAlignedRoomsSyncTime < ALIGNED_ROOMS_SYNC_CACHE_TTL) {
+    return cachedAlignedRoomsMap;
+  }
+
   const localMap = getAlignedRoomsMap();
   if (!TOKEN) return localMap;
 
   try {
-    // 1. Search for Aligned Room notes in HubSpot CRM
-    const res = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'hs_note_body',
-            operator: 'CONTAINS_TOKEN',
-            value: '*ALIGNED ROOM*'
-          }]
-        }],
-        properties: ['hs_note_body', 'hs_createdate'],
-        limit: 100
+    // 1. Search concurrently for both Aligned Room notes and Removal notes
+    const [res, removeRes] = await Promise.all([
+      fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filterGroups: [{
+            filters: [{
+              propertyName: 'hs_note_body',
+              operator: 'CONTAINS_TOKEN',
+              value: '*ALIGNED ROOM*'
+            }]
+          }],
+          properties: ['hs_note_body', 'hs_createdate'],
+          limit: 100
+        }),
+        cache: 'no-store',
       }),
-      cache: 'no-store',
-    });
-
-    if (!res.ok) return localMap;
-    const data = await res.json();
-    const notes = data.results || [];
-    if (notes.length === 0) return localMap;
-
-    // 2. Batch fetch deal associations for these notes
-    const assocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inputs: notes.map((n: any) => ({ id: n.id }))
+      fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filterGroups: [{
+            filters: [{
+              propertyName: 'hs_note_body',
+              operator: 'CONTAINS_TOKEN',
+              value: '*Aligned Room status removed*'
+            }]
+          }],
+          properties: ['hs_note_body', 'hs_createdate'],
+          limit: 100
+        }),
+        cache: 'no-store',
       }),
-      cache: 'no-store',
-    });
+    ]);
 
-    if (!assocRes.ok) return localMap;
-    const assocData = await assocRes.json();
+    const notesData = res.ok ? await res.json() : { results: [] };
+    const removeData = removeRes.ok ? await removeRes.json() : { results: [] };
 
-    // 3. Search for any removal notes
-    const removeRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'hs_note_body',
-            operator: 'CONTAINS_TOKEN',
-            value: '*Aligned Room status removed*'
-          }]
-        }],
-        properties: ['hs_note_body', 'hs_createdate'],
-        limit: 100
-      }),
-      cache: 'no-store',
-    });
+    const notes: any[] = notesData.results || [];
+    const removeNotes: any[] = removeData.results || [];
 
-    const removalDealMap: Record<string, number> = {};
-    if (removeRes.ok) {
-      const removeData = await removeRes.json();
-      const removeNotes = removeData.results || [];
-      if (removeNotes.length > 0) {
-        const rAssocRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inputs: removeNotes.map((n: any) => ({ id: n.id }))
-          }),
-          cache: 'no-store',
-        });
-        if (rAssocRes.ok) {
-          const rAssocData = await rAssocRes.json();
-          (rAssocData.results || []).forEach((r: any) => {
-            const noteObj = removeNotes.find((n: any) => n.id === r.from.id);
-            const removeTime = noteObj?.properties?.hs_createdate
-              ? new Date(noteObj.properties.hs_createdate).getTime()
-              : 0;
-            (r.to || []).forEach((t: any) => {
-              const dId = t.toObjectId.toString();
-              if (!removalDealMap[dId] || removeTime > removalDealMap[dId]) {
-                removalDealMap[dId] = removeTime;
-              }
-            });
-          });
-        }
-      }
+    if (notes.length === 0 && removeNotes.length === 0) {
+      cachedAlignedRoomsMap = localMap;
+      lastAlignedRoomsSyncTime = Date.now();
+      return localMap;
     }
 
-    // 4. Construct merged map from HubSpot CRM
+    // 2. Concurrently batch fetch deal associations for both note sets
+    const [assocRes, rAssocRes] = await Promise.all([
+      notes.length > 0
+        ? fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: notes.map((n: any) => ({ id: n.id }))
+            }),
+            cache: 'no-store',
+          })
+        : null,
+      removeNotes.length > 0
+        ? fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: removeNotes.map((n: any) => ({ id: n.id }))
+            }),
+            cache: 'no-store',
+          })
+        : null,
+    ]);
+
+    const assocData = assocRes && assocRes.ok ? await assocRes.json() : { results: [] };
+    const rAssocData = rAssocRes && rAssocRes.ok ? await rAssocRes.json() : { results: [] };
+
+    const removalDealMap: Record<string, number> = {};
+    (rAssocData.results || []).forEach((r: any) => {
+      const noteObj = removeNotes.find((n: any) => n.id === r.from.id);
+      const removeTime = noteObj?.properties?.hs_createdate
+        ? new Date(noteObj.properties.hs_createdate).getTime()
+        : 0;
+      (r.to || []).forEach((t: any) => {
+        const dId = t.toObjectId.toString();
+        if (!removalDealMap[dId] || removeTime > removalDealMap[dId]) {
+          removalDealMap[dId] = removeTime;
+        }
+      });
+    });
+
+    // 3. Construct merged map from HubSpot CRM
     const mergedMap = { ...localMap };
     (assocData.results || []).forEach((r: any) => {
       const noteObj = notes.find((n: any) => n.id === r.from.id);
@@ -146,13 +160,16 @@ export async function syncAlignedRoomsFromHubSpot(): Promise<Record<string, Alig
       });
     });
 
-    // Write back to file for fast local reads
+    // Write back to file and update memory cache
     try {
       fs.mkdirSync(path.dirname(ALIGNED_ROOMS_FILE), { recursive: true });
       fs.writeFileSync(ALIGNED_ROOMS_FILE, JSON.stringify(mergedMap, null, 2), 'utf-8');
     } catch (err) {
       console.error('Error caching synced aligned rooms map:', err);
     }
+
+    cachedAlignedRoomsMap = mergedMap;
+    lastAlignedRoomsSyncTime = Date.now();
 
     return mergedMap;
   } catch (err) {
@@ -184,6 +201,9 @@ export async function saveAlignedRoom(
   } catch (err) {
     console.error('Error saving aligned room to file:', err);
   }
+
+  cachedAlignedRoomsMap = map;
+  lastAlignedRoomsSyncTime = Date.now();
 
   // Manage custom tag
   if (hasAlignedRoom) {
