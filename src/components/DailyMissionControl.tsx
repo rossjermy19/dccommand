@@ -96,11 +96,14 @@ export function DailyMissionControl({
 
       // 2. Action Due (unfulfilled task specifically due today or overdue)
       else if (deal.health === 'warning') {
+        const isToday = deal.healthReason?.toLowerCase().includes('today');
         list.push({
           id: `action_${deal.id}`,
           deal,
           type: 'action_due',
-          title: deal.nextTaskSubject ? `Task due: ${deal.nextTaskSubject}` : `Action due: Follow-up required`,
+          title: deal.nextTaskSubject
+            ? (isToday ? `Task Due Today: ${deal.nextTaskSubject}` : `Task due: ${deal.nextTaskSubject}`)
+            : `Action due: Follow-up required`,
           description: deal.healthReason || `Deliverable or proposal due for ${deal.name}.`,
           urgency: 'high',
         });
@@ -117,6 +120,22 @@ export function DailyMissionControl({
           urgency: 'medium',
         });
       }
+    });
+
+    // Sort: Tasks due today first, then other action items, then 7-day reviews, then new deals
+    list.sort((a, b) => {
+      const aIsToday = a.type === 'action_due' && a.deal.healthReason?.toLowerCase().includes('today');
+      const bIsToday = b.type === 'action_due' && b.deal.healthReason?.toLowerCase().includes('today');
+      if (aIsToday && !bIsToday) return -1;
+      if (!aIsToday && bIsToday) return 1;
+
+      if (a.type === 'action_due' && b.type !== 'action_due') return -1;
+      if (a.type !== 'action_due' && b.type === 'action_due') return 1;
+
+      if (a.type === 'stalled' && b.type !== 'stalled') return -1;
+      if (a.type !== 'stalled' && b.type === 'stalled') return 1;
+
+      return 0;
     });
 
     return list;
@@ -543,9 +562,13 @@ export function DailyMissionControl({
                         </span>
                       )}
                       {mission.type === 'action_due' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          <Clock className="h-3 w-3 text-amber-600" />
-                          <span>ACTION DUE</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                          mission.description?.toLowerCase().includes('today')
+                            ? 'bg-rose-50 text-rose-700 border border-rose-300 animate-pulse'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}>
+                          <Clock className={`h-3 w-3 ${mission.description?.toLowerCase().includes('today') ? 'text-rose-600' : 'text-amber-600'}`} />
+                          <span>{mission.description?.toLowerCase().includes('today') ? 'DUE TODAY' : 'ACTION DUE'}</span>
                         </span>
                       )}
                       {mission.type === 'new_deal' && (

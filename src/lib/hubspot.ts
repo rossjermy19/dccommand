@@ -196,32 +196,35 @@ export async function getOpenDeals(): Promise<Deal[]> {
         });
 
         if (allTaskInputs.length > 0) {
-          const tasksRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              inputs: allTaskInputs.slice(0, 100),
-              properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
-            }),
-          });
-          if (tasksRes.ok) {
-            const tasksData = await tasksRes.json();
-            (tasksData.results || []).forEach((taskItem: any) => {
-              const taskId = taskItem.id;
-              const dealId = taskToDealMap[taskId];
-              if (dealId) {
-                if (!dealTaskMap[dealId]) dealTaskMap[dealId] = [];
-                dealTaskMap[dealId].push({
-                  id: taskId,
-                  subject: taskItem.properties?.hs_task_subject || 'Task',
-                  status: taskItem.properties?.hs_task_status || 'NOT_STARTED',
-                  due: taskItem.properties?.hs_timestamp
-                    ? new Date(taskItem.properties.hs_timestamp).getTime()
-                    : 0,
-                  dueStr: taskItem.properties?.hs_timestamp || null,
-                });
-              }
+          for (let i = 0; i < allTaskInputs.length; i += 100) {
+            const chunk = allTaskInputs.slice(i, i + 100);
+            const tasksRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inputs: chunk,
+                properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
+              }),
             });
+            if (tasksRes.ok) {
+              const tasksData = await tasksRes.json();
+              (tasksData.results || []).forEach((taskItem: any) => {
+                const taskId = taskItem.id;
+                const dealId = taskToDealMap[taskId];
+                if (dealId) {
+                  if (!dealTaskMap[dealId]) dealTaskMap[dealId] = [];
+                  dealTaskMap[dealId].push({
+                    id: taskId,
+                    subject: taskItem.properties?.hs_task_subject || 'Task',
+                    status: taskItem.properties?.hs_task_status || 'NOT_STARTED',
+                    due: taskItem.properties?.hs_timestamp
+                      ? new Date(taskItem.properties.hs_timestamp).getTime()
+                      : 0,
+                    dueStr: taskItem.properties?.hs_timestamp || null,
+                  });
+                }
+              });
+            }
           }
         }
       }
@@ -247,32 +250,35 @@ export async function getOpenDeals(): Promise<Deal[]> {
         });
 
         if (allMeetingInputs.length > 0) {
-          const meetingsRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              inputs: allMeetingInputs.slice(0, 100),
-              properties: ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_outcome'],
-            }),
-          });
-          if (meetingsRes.ok) {
-            const meetingsData = await meetingsRes.json();
-            (meetingsData.results || []).forEach((mItem: any) => {
-              const dealId = meetingToDealMap[mItem.id];
-              if (dealId) {
-                if (!dealMeetingMap[dealId]) dealMeetingMap[dealId] = [];
-                const startMs = mItem.properties?.hs_meeting_start_time
-                  ? new Date(mItem.properties.hs_meeting_start_time).getTime()
-                  : 0;
-                dealMeetingMap[dealId].push({
-                  id: mItem.id,
-                  title: mItem.properties?.hs_meeting_title || 'Booked Meeting',
-                  start: startMs,
-                  startDateStr: mItem.properties?.hs_meeting_start_time || null,
-                  outcome: mItem.properties?.hs_meeting_outcome || null,
-                });
-              }
+          for (let i = 0; i < allMeetingInputs.length; i += 100) {
+            const chunk = allMeetingInputs.slice(i, i + 100);
+            const meetingsRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inputs: chunk,
+                properties: ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_outcome'],
+              }),
             });
+            if (meetingsRes.ok) {
+              const meetingsData = await meetingsRes.json();
+              (meetingsData.results || []).forEach((mItem: any) => {
+                const dealId = meetingToDealMap[mItem.id];
+                if (dealId) {
+                  if (!dealMeetingMap[dealId]) dealMeetingMap[dealId] = [];
+                  const startMs = mItem.properties?.hs_meeting_start_time
+                    ? new Date(mItem.properties.hs_meeting_start_time).getTime()
+                    : 0;
+                  dealMeetingMap[dealId].push({
+                    id: mItem.id,
+                    title: mItem.properties?.hs_meeting_title || 'Booked Meeting',
+                    start: startMs,
+                    startDateStr: mItem.properties?.hs_meeting_start_time || null,
+                    outcome: mItem.properties?.hs_meeting_outcome || null,
+                  });
+                }
+              });
+            }
           }
         }
       }
@@ -362,7 +368,30 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const openTasks = dealTasks.filter((t) => t.status !== 'COMPLETED');
     openTasks.sort((a, b) => a.due - b.due);
 
-    const futureTask = openTasks.find((t) => t.due >= now);
+    // Compute today's calendar bounds (local date)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayMs = startOfToday.getTime();
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    const endOfTodayMs = endOfToday.getTime();
+
+    // 1. Task due TODAY: Any open task where the due timestamp falls on today's calendar date
+    const taskDueToday = openTasks.find(
+      (t) => t.due >= startOfTodayMs && t.due <= endOfTodayMs
+    );
+
+    // 2. Overdue task: Any open task due before today
+    // Only treat as fulfilled if deal had a touch on a subsequent day after the task was due
+    const overdueTask = openTasks.find((t) => {
+      if (t.due >= startOfTodayMs) return false;
+      if (latestTouchTime !== null && latestTouchTime > (t.due + 24 * 60 * 60 * 1000)) return false;
+      return true;
+    });
+
+    // 3. Future planned task: Due strictly after today
+    const futureTask = openTasks.find((t) => t.due > endOfTodayMs);
 
     // Meeting inspection for planned follow-up (e.g. Talk3PL)
     const dealMeetings = dealMeetingMap[item.id] || [];
@@ -371,18 +400,17 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
     const isMeetingBookedStage = props.dealstage === '1209215206' || (stageLabels[props.dealstage] || '').toLowerCase().includes('meeting booked');
 
-    // An overdue task is ONLY active if it has NOT been fulfilled by a subsequent contact!
-    const unfulfilledOverdueTask = openTasks.find((t) => {
-      if (t.due >= now) return false;
-      if (daysSinceContact === 0) return false; // touched today!
-      if (latestTouchTime !== null && latestTouchTime > t.due) return false; // touched after task due date!
-      return true;
-    });
-
+    // Priority for next task: task due today -> overdue task -> future task -> first open task
     let nextTaskDate: string | null = null;
     let nextTaskSubject: string | null = null;
 
-    if (futureTask) {
+    if (taskDueToday) {
+      nextTaskDate = taskDueToday.dueStr;
+      nextTaskSubject = taskDueToday.subject;
+    } else if (overdueTask) {
+      nextTaskDate = overdueTask.dueStr;
+      nextTaskSubject = overdueTask.subject;
+    } else if (futureTask) {
       nextTaskDate = futureTask.dueStr;
       nextTaskSubject = futureTask.subject;
     } else if (openTasks.length > 0) {
@@ -393,9 +421,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const nextMeetingDate = futureMeeting ? futureMeeting.startDateStr : null;
     const nextMeetingTitle = futureMeeting ? futureMeeting.title : null;
 
-    // Health logic - Strict 7-Day Inactivity Rule requested by Ross:
-    // If a deal has had ANY interaction/note in the last 7 days, it is healthy and cleared from the desk.
-    // It only reappears if 7 days elapse with zero interaction, or if an explicit task is due.
+    // Health logic - Strict Action Item & 7-Day Inactivity Rule:
+    // If an open task is due TODAY or OVERDUE, it is an immediate action item requiring Ross's attention.
     let health: 'urgent' | 'warning' | 'healthy' | 'neutral' | 'snoozed' = 'healthy';
     let healthReason = 'In active rhythm';
 
@@ -403,18 +430,26 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const stageLabelLower = (stageLabels[props.dealstage] || STAGE_LABELS[props.dealstage] || '').toLowerCase();
     const isClosedWon = stageIdLower === 'closedwon' || stageIdLower === '5030008021' || stageLabelLower.includes('closed won');
 
-    if (isBackWithLibertyJ) {
-      // 0. Handed to Liberty J -> Partner action to chase. Do not hassle Ross on his daily active desk!
+    if (isClosedWon) {
+      // Closed Won deals are closed successfully
+      health = 'healthy';
+      healthReason = 'Deal Won! Closed successfully.';
+    } else if (taskDueToday) {
+      // 1. Task due TODAY -> Immediate alert on Daily Desk Command!
+      health = 'warning';
+      healthReason = `Task due today: ${taskDueToday.subject}`;
+    } else if (overdueTask) {
+      // 2. Overdue task specifically assigned and not yet completed
+      health = 'warning';
+      healthReason = `Overdue task: ${overdueTask.subject}`;
+    } else if (isBackWithLibertyJ) {
+      // Handed to Liberty J -> Partner action to chase.
       health = 'snoozed';
       healthReason = daysWithLibertyJ !== null
         ? `With Liberty J (${daysWithLibertyJ}d) — action with partner to chase`
         : 'With Liberty J — action with partner to chase';
-    } else if (isClosedWon) {
-      // Closed Won deals are closed successfully
-      health = 'healthy';
-      healthReason = 'Deal Won! Closed successfully.';
     } else if (futureMeeting || isMeetingBookedStage) {
-      // 1. Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
+      // Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
       health = 'snoozed';
       if (futureMeeting) {
         const formattedMeetingDate = new Date(futureMeeting.start).toLocaleDateString('en-GB', {
@@ -426,7 +461,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
         healthReason = 'Meeting booked with prospect';
       }
     } else if (futureTask) {
-      // 2. Future planned follow-up task
+      // Future planned follow-up task
       health = 'snoozed';
       const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -434,17 +469,12 @@ export async function getOpenDeals(): Promise<Deal[]> {
         year: 'numeric',
       });
       healthReason = `Planned follow-up: ${futureTask.subject} (${formattedDue})`;
-    } else if (unfulfilledOverdueTask) {
-      // 3. Overdue task specifically assigned and not yet touched
-      health = 'warning';
-      healthReason = `Task due: ${unfulfilledOverdueTask.subject}`;
     } else if (daysSinceContact !== null && daysSinceContact >= 7) {
-      // 4. Strict 7-Day Inactivity Rule:
-      // Remind Ross only after 7 days of complete silence/no interaction
+      // Strict 7-Day Inactivity Rule:
       health = 'urgent';
       healthReason = `7-Day Review: Last note/touch ${daysSinceContact}d ago with no next action scheduled.`;
     } else {
-      // 5. Touched/noted within the last 7 days (< 7 days) -> Clean desk!
+      // Touched/noted within the last 7 days (< 7 days) -> Clean desk!
       health = 'healthy';
       healthReason = daysSinceContact === 0
         ? 'Contacted today via note/email/meeting'
