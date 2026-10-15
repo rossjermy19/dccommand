@@ -448,6 +448,12 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const stageIdLower = (props.dealstage || '').toLowerCase();
     const stageLabelLower = (stageLabels[props.dealstage] || STAGE_LABELS[props.dealstage] || '').toLowerCase();
     const isClosedWon = stageIdLower === 'closedwon' || stageIdLower === '5030008021' || stageLabelLower.includes('closed won');
+    const isBackBurning = stageIdLower === '1638150379' ||
+                          stageIdLower === '5030008012' ||
+                          stageIdLower === '5536133318' ||
+                          stageLabelLower.includes('back burning') ||
+                          stageLabelLower.includes('back burner') ||
+                          stageLabelLower.includes('backburner');
 
     if (isClosedWon) {
       // Closed Won deals are closed successfully
@@ -467,6 +473,33 @@ export async function getOpenDeals(): Promise<Deal[]> {
       healthReason = daysWithLibertyJ !== null
         ? `With Liberty J (${daysWithLibertyJ}d) — action with partner to chase`
         : 'With Liberty J — action with partner to chase';
+    } else if (isBackBurning) {
+      // Back Burning Deal -> 1-Month (30-Day) review cadence
+      if (futureMeeting) {
+        health = 'snoozed';
+        const formattedMeetingDate = new Date(futureMeeting.start).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+        });
+        healthReason = `Meeting booked: ${futureMeeting.title} (${formattedMeetingDate})`;
+      } else if (futureTask) {
+        health = 'snoozed';
+        const formattedDue = new Date(futureTask.due).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+        healthReason = `Monthly review scheduled: ${futureTask.subject} (${formattedDue})`;
+      } else if (daysSinceContact !== null && daysSinceContact >= 30) {
+        // 30+ days have elapsed without review: Trigger monthly reminder!
+        health = 'warning';
+        healthReason = `Monthly Back Burning Review: ${daysSinceContact}d since last touch. Decide next step.`;
+      } else {
+        // Less than 30 days: Snoozed until monthly check-in is due
+        health = 'snoozed';
+        const daysLeft = Math.max(1, 30 - (daysSinceContact || 0));
+        healthReason = `Back Burning — monthly review due in ${daysLeft}d`;
+      }
     } else if (futureMeeting || isMeetingBookedStage) {
       // Meeting is booked (e.g. Talk3PL) -> Planned follow-up in momentum
       health = 'snoozed';
@@ -489,7 +522,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
       });
       healthReason = `Planned follow-up: ${futureTask.subject} (${formattedDue})`;
     } else if (daysSinceContact !== null && daysSinceContact >= 7) {
-      // Strict 7-Day Inactivity Rule:
+      // Strict 7-Day Inactivity Rule for active pipeline deals:
       health = 'urgent';
       healthReason = `7-Day Review: Last note/touch ${daysSinceContact}d ago with no next action scheduled.`;
     } else {
@@ -992,6 +1025,31 @@ export async function updateDealStage(
       );
     } catch (e) {
       console.warn('Failed to log closed lost note:', e);
+    }
+  }
+
+  // If moved to Back Burning: Automatically schedule a 1-month (30-day) review reminder task & note
+  const isBackBurning = stage === '1638150379' || stage === '5030008012' || stage === '5536133318';
+  if (isBackBurning) {
+    try {
+      const due30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const formattedDate = new Date(due30Days).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      await createDealTask(dealId, {
+        subject: '🔥 Monthly Back Burning Review',
+        dueDate: due30Days,
+        body: 'Automated 1-month reminder: Review Back Burning deal and decide whether to re-engage, close lost, or keep on back burner.',
+        priority: 'MEDIUM',
+      });
+      await addDealNote(
+        dealId,
+        `🔥 <strong>[DC Command Centre]</strong> Deal moved to Back Burning.<br/>Automated monthly review task scheduled for ${formattedDate}.`
+      );
+    } catch (e) {
+      console.warn('Failed to schedule Back Burning monthly review task/note:', e);
     }
   }
 

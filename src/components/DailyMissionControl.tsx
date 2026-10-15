@@ -94,14 +94,17 @@ export function DailyMissionControl({
         });
       }
 
-      // 2. Action Due (unfulfilled task specifically due today or overdue)
+      // 2. Action Due (unfulfilled task specifically due today or overdue, or monthly Back Burning review)
       else if (deal.health === 'warning') {
         const isToday = deal.healthReason?.toLowerCase().includes('today');
+        const isBackBurning = deal.healthReason?.toLowerCase().includes('back burning');
         list.push({
           id: `action_${deal.id}`,
           deal,
           type: 'action_due',
-          title: deal.nextTaskSubject
+          title: isBackBurning
+            ? 'Monthly Back Burning Review'
+            : deal.nextTaskSubject
             ? (isToday ? `Task Due Today: ${deal.nextTaskSubject}` : `Task due: ${deal.nextTaskSubject}`)
             : `Action due: Follow-up required`,
           description: deal.healthReason || `Deliverable or proposal due for ${deal.name}.`,
@@ -736,6 +739,28 @@ export function DailyMissionControl({
                         <img src="/liberty-jai-logo.jpg" alt="Liberty Jai" className="h-full w-full object-contain" />
                       </div>
                       <span>To Liberty J</span>
+                    </button>
+
+                    {/* Resolution Action: Move to Back Burning (1-Month Snooze) */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          await fetch(`/api/hubspot/deal/${mission.deal.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stage: '1638150379' }),
+                          });
+                          clearMission(mission.id);
+                          if (onRefreshDeals) onRefreshDeals();
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 transition"
+                      title="Move deal to Back Burning and schedule an automated 1-month review reminder"
+                    >
+                      <Flame className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Back Burning (1mo)</span>
                     </button>
 
                     {/* Resolution Action 5: Quick Mark Lost */}

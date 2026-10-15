@@ -128,6 +128,14 @@ export function CompactDealCard({
           </span>
         );
       case 'warning':
+        if (deal.healthReason?.toLowerCase().includes('monthly back burning')) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+              <Clock className="h-2.5 w-2.5 text-amber-700" />
+              <span>Monthly Review Due</span>
+            </span>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
             <Clock className="h-2.5 w-2.5 text-amber-600" />
@@ -135,6 +143,14 @@ export function CompactDealCard({
           </span>
         );
       case 'snoozed':
+        if (deal.healthReason?.toLowerCase().includes('back burning')) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50/80 text-amber-800 border border-amber-200/80">
+              <CalendarCheck className="h-2.5 w-2.5 text-amber-600" />
+              <span>Monthly Review</span>
+            </span>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
             <CalendarCheck className="h-2.5 w-2.5 text-indigo-600" />
