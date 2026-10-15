@@ -2,8 +2,9 @@ import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
-import { syncGoldDealsFromHubSpot } from './gold-deals';
-import { syncAlignedRoomsFromHubSpot } from './aligned-rooms';
+import { getGoldDealsMap, syncGoldDealsFromHubSpot } from './gold-deals';
+import { getAlignedRoomsMap, syncAlignedRoomsFromHubSpot } from './aligned-rooms';
+import { hubspotFetch, hubspotSearchFetch } from './hubspot-fetch';
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || '';
@@ -57,7 +58,7 @@ export async function fetchPipelineStages(): Promise<Record<string, string>> {
   }
   if (!TOKEN) return STAGE_LABELS;
   try {
-    const res = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/pipelines/deals`, {
+    const res = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/pipelines/deals`, {
       headers: {
         Authorization: `Bearer ${TOKEN}`,
         'Content-Type': 'application/json',
@@ -139,10 +140,10 @@ export async function getOpenDeals(): Promise<Deal[]> {
     ],
   };
 
-  // Wave 1: Simultaneously execute deals search, stage lookup, and all status synchronisations
+  // Wave 1: Simultaneously execute deals search and stage lookup, while fetching cached status maps
   const [stageLabels, response, libertyJMap, goldDealsMap, alignedRoomsMap] = await Promise.all([
     fetchPipelineStages(),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
+    hubspotSearchFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${TOKEN}`,
@@ -190,12 +191,12 @@ export async function getOpenDeals(): Promise<Deal[]> {
     if (rawDeals.length > 0) {
       // Wave 2: Concurrently fetch task associations and meeting associations
       const [assocRes, meetingAssocRes] = await Promise.all([
-        fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
+        hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/tasks/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
         }),
-        fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/meetings/batch/read`, {
+        hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/deals/meetings/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ inputs: rawDeals.map((d: any) => ({ id: d.id })) }),
@@ -235,7 +236,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
         const chunk = allTaskInputs.slice(i, i + 100);
         taskBatchPromises.push(
           (async () => {
-            const tasksRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+            const tasksRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -271,7 +272,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
         const chunk = allMeetingInputs.slice(i, i + 100);
         meetingBatchPromises.push(
           (async () => {
-            const meetingsRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
+            const meetingsRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -559,22 +560,22 @@ export async function getDealDetails(dealId: string): Promise<{
 
   // Fetch associations concurrently
   const [notesAssocRes, tasksAssocRes, contactsAssocRes, emailsAssocRes, meetingsAssocRes, callsAssocRes] = await Promise.all([
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/notes`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/contacts`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/contacts`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/emails`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/emails`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/meetings`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/meetings`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
-    fetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/calls`, {
+    hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/calls`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     }),
   ]);
@@ -598,7 +599,7 @@ export async function getDealDetails(dealId: string): Promise<{
   // Fetch batch details
   const [notesBatchRes, tasksBatchRes, contactsBatchRes, emailsBatchRes, meetingsBatchRes, callsBatchRes] = await Promise.all([
     noteIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -608,7 +609,7 @@ export async function getDealDetails(dealId: string): Promise<{
         })
       : null,
     taskIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -625,7 +626,7 @@ export async function getDealDetails(dealId: string): Promise<{
         })
       : null,
     contactIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/contacts/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/contacts/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -635,7 +636,7 @@ export async function getDealDetails(dealId: string): Promise<{
         })
       : null,
     emailIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -645,7 +646,7 @@ export async function getDealDetails(dealId: string): Promise<{
         })
       : null,
     meetingIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -655,7 +656,7 @@ export async function getDealDetails(dealId: string): Promise<{
         })
       : null,
     callIds.length > 0
-      ? fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls/batch/read`, {
+      ? hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls/batch/read`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -778,7 +779,7 @@ export async function addDealNote(dealId: string, noteBody: string): Promise<any
     ],
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -831,7 +832,7 @@ export async function createDealTask(
     ],
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -854,7 +855,7 @@ export async function updateDealTask(
 ): Promise<any> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/${taskId}`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/${taskId}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -885,7 +886,7 @@ export async function updateDealSource(dealId: string, subSourceOrTag: string): 
   saveCustomTag(dealId, subSourceOrTag);
 
   try {
-    const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+    const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${TOKEN}`,
@@ -908,7 +909,7 @@ export async function updateDealCloseDate(dealId: string, closeDateIso: string):
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
   try {
-    const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+    const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${TOKEN}`,
@@ -950,7 +951,7 @@ export async function updateDealStage(
     properties['closed_lost_reason'] = closedLostReason;
   }
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -962,7 +963,7 @@ export async function updateDealStage(
   if (!response.ok) {
     // If closed_lost_reason property fails (e.g. not configured on this portal), retry updating dealstage directly
     if (properties['closed_lost_reason']) {
-      const retryRes = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+      const retryRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -1050,7 +1051,7 @@ export async function createDealMeeting(
     associations,
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/meetings`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -1123,7 +1124,7 @@ export async function createDealCall(
     associations,
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/calls`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -1185,7 +1186,7 @@ export async function logDealEmail(
     associations,
   };
 
-  const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails`, {
+  const response = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/emails`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,

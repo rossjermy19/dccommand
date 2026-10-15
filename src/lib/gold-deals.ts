@@ -31,151 +31,18 @@ export function getGoldDealsMap(): Record<string, GoldDealRecord> {
   return {};
 }
 
+export function setCachedGoldMap(map: Record<string, GoldDealRecord>) {
+  cachedGoldMap = map;
+}
+
 /**
  * Synchronises Gold deal status with HubSpot CRM notes.
- * Executes search and association queries concurrently and caches in memory.
+ * Delegates to the unified rate-limited status sync to avoid 429 limits.
  */
 export async function syncGoldDealsFromHubSpot(force = false): Promise<Record<string, GoldDealRecord>> {
-  if (!force && cachedGoldMap && Date.now() - lastGoldSyncTime < GOLD_SYNC_CACHE_TTL) {
-    return cachedGoldMap;
-  }
-
-  const localMap = getGoldDealsMap();
-  if (!TOKEN) return localMap;
-
-  try {
-    // 1. Search concurrently for both Gold Deal notes and Removal notes
-    const [res, removeRes] = await Promise.all([
-      fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filterGroups: [{
-            filters: [{
-              propertyName: 'hs_note_body',
-              operator: 'CONTAINS_TOKEN',
-              value: '*HIGH CHANCE (Gold Deal)*'
-            }]
-          }],
-          properties: ['hs_note_body', 'hs_createdate'],
-          limit: 100
-        }),
-        cache: 'no-store',
-      }),
-      fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/notes/search`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filterGroups: [{
-            filters: [{
-              propertyName: 'hs_note_body',
-              operator: 'CONTAINS_TOKEN',
-              value: '*Gold Deal) status removed*'
-            }]
-          }],
-          properties: ['hs_note_body', 'hs_createdate'],
-          limit: 100
-        }),
-        cache: 'no-store',
-      }),
-    ]);
-
-    const notesData = res.ok ? await res.json() : { results: [] };
-    const removeData = removeRes.ok ? await removeRes.json() : { results: [] };
-
-    const notes: any[] = notesData.results || [];
-    const removeNotes: any[] = removeData.results || [];
-
-    if (notes.length === 0 && removeNotes.length === 0) {
-      cachedGoldMap = localMap;
-      lastGoldSyncTime = Date.now();
-      return localMap;
-    }
-
-    // 2. Concurrently batch fetch deal associations for both note sets
-    const [assocRes, rAssocRes] = await Promise.all([
-      notes.length > 0
-        ? fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              inputs: notes.map((n: any) => ({ id: n.id }))
-            }),
-            cache: 'no-store',
-          })
-        : null,
-      removeNotes.length > 0
-        ? fetch(`${HUBSPOT_BASE_URL}/crm/v4/associations/notes/deals/batch/read`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              inputs: removeNotes.map((n: any) => ({ id: n.id }))
-            }),
-            cache: 'no-store',
-          })
-        : null,
-    ]);
-
-    const assocData = assocRes && assocRes.ok ? await assocRes.json() : { results: [] };
-    const rAssocData = rAssocRes && rAssocRes.ok ? await rAssocRes.json() : { results: [] };
-
-    const removalDealMap: Record<string, number> = {};
-    (rAssocData.results || []).forEach((r: any) => {
-      const noteObj = removeNotes.find((n: any) => n.id === r.from.id);
-      const removeTime = noteObj?.properties?.hs_createdate
-        ? new Date(noteObj.properties.hs_createdate).getTime()
-        : 0;
-      (r.to || []).forEach((t: any) => {
-        const dId = t.toObjectId.toString();
-        if (!removalDealMap[dId] || removeTime > removalDealMap[dId]) {
-          removalDealMap[dId] = removeTime;
-        }
-      });
-    });
-
-    // 3. Construct merged map from HubSpot CRM
-    const mergedMap = { ...localMap };
-    (assocData.results || []).forEach((r: any) => {
-      const noteObj = notes.find((n: any) => n.id === r.from.id);
-      const markTime = noteObj?.properties?.hs_createdate
-        ? new Date(noteObj.properties.hs_createdate).getTime()
-        : 0;
-      const markDateStr = noteObj?.properties?.hs_createdate || new Date().toISOString();
-
-      (r.to || []).forEach((t: any) => {
-        const dealId = t.toObjectId.toString();
-        const removeTime = removalDealMap[dealId] || 0;
-
-        if (removeTime > markTime) {
-          if (mergedMap[dealId]) {
-            mergedMap[dealId].isGold = false;
-          }
-        } else {
-          mergedMap[dealId] = {
-            isGold: true,
-            date: markDateStr,
-            dealName: mergedMap[dealId]?.dealName,
-          };
-        }
-      });
-    });
-
-    // Write back to file and update memory cache
-    try {
-      fs.mkdirSync(path.dirname(GOLD_DEALS_FILE), { recursive: true });
-      fs.writeFileSync(GOLD_DEALS_FILE, JSON.stringify(mergedMap, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Error caching synced gold deals map:', err);
-    }
-
-    cachedGoldMap = mergedMap;
-    lastGoldSyncTime = Date.now();
-
-    return mergedMap;
-  } catch (err) {
-    console.warn('Could not sync gold deals from HubSpot:', err);
-    return localMap;
-  }
+  const { syncAllCommandCentreNotesFromHubSpot } = await import('./status-sync');
+  const result = await syncAllCommandCentreNotesFromHubSpot(force);
+  return result.goldDeals;
 }
 
 /**
