@@ -397,14 +397,26 @@ export async function getOpenDeals(): Promise<Deal[]> {
     const endOfTodayMs = endOfToday.getTime();
 
     // 1. Task due TODAY: Any open task where the due timestamp falls on today's calendar date
-    const taskDueToday = openTasks.find(
-      (t) => t.due >= startOfTodayMs && t.due <= endOfTodayMs
-    );
+    const taskDueToday = openTasks.find((t) => {
+      if (t.due < startOfTodayMs || t.due > endOfTodayMs) return false;
+      // If it is an automated review / 7-day check task, and the deal was already touched today
+      // (or touch timestamp is on or after the task timestamp), treat it as fulfilled!
+      const isAutoCheck = /7-day check|follow up on note|monthly.*review/i.test(t.subject);
+      if (isAutoCheck && (daysSinceContact === 0 || (latestTouchTime !== null && latestTouchTime >= t.due))) {
+        return false;
+      }
+      return true;
+    });
 
     // 2. Overdue task: Any open task due before today
-    // Only treat as fulfilled if deal had a touch on a subsequent day after the task was due
+    // Only treat as fulfilled if deal had a touch on a subsequent day after the task was due,
+    // or if it is an auto-check and touched today
     const overdueTask = openTasks.find((t) => {
       if (t.due >= startOfTodayMs) return false;
+      const isAutoCheck = /7-day check|follow up on note|monthly.*review/i.test(t.subject);
+      if (isAutoCheck && (daysSinceContact === 0 || (latestTouchTime !== null && latestTouchTime >= t.due))) {
+        return false;
+      }
       if (latestTouchTime !== null && latestTouchTime > (t.due + 24 * 60 * 60 * 1000)) return false;
       return true;
     });
@@ -826,7 +838,43 @@ export async function addDealNote(dealId: string, noteBody: string): Promise<any
     throw new Error(`Failed to create note: ${errorText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+
+  // Automatically mark any previous open 7-Day Check or note follow-up tasks on this deal as COMPLETED
+  try {
+    const tasksAssocRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    if (tasksAssocRes.ok) {
+      const taskAssoc = await tasksAssocRes.json();
+      const taskIds = (taskAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+      if (taskIds.length > 0) {
+        const batchReadRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: taskIds,
+            properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
+          }),
+        });
+        if (batchReadRes.ok) {
+          const batchData = await batchReadRes.json();
+          const tasksToComplete = (batchData.results || []).filter((t: any) => {
+            const status = t.properties?.hs_task_status;
+            const subject = t.properties?.hs_task_subject || '';
+            return status !== 'COMPLETED' && /7-day check|follow up on note|review/i.test(subject);
+          });
+          for (const t of tasksToComplete) {
+            await updateDealTask(t.id, 'COMPLETED').catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Non-blocking error auto-completing previous check tasks:', err);
+  }
+
+  return result;
 }
 
 export async function createDealTask(
