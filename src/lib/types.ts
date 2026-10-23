@@ -130,3 +130,50 @@ export const PIPELINE_STAGES = [
   { id: '1352329432', label: 'No Response - After Meeting' },
   { id: '5536133318', label: 'Back Burner' },
 ];
+
+/**
+ * Checks whether a deal stage corresponds to an active closing stage:
+ * Expected to Close, Upside, Committed, or Contract Sent.
+ * These deals are actively being worked and negotiated by Ross,
+ * and should never be surfaced as stalled/action-required on the Command Centre dashboard.
+ */
+export function isActivelyClosingStage(stageId: string = '', stageLabel: string = ''): boolean {
+  const idLower = (stageId || '').toLowerCase();
+  const labelLower = (stageLabel || '').toLowerCase().trim();
+
+  // Upside
+  if (idLower === '1465977055' || idLower === '5030008017' || labelLower.includes('upside')) {
+    return true;
+  }
+
+  // Expected to Close
+  if (idLower === '1965601015' || idLower === '5030008018' || labelLower.includes('expected to close')) {
+    return true;
+  }
+
+  // Committed
+  if (
+    idLower === 'decisionmakerboughtin' ||
+    idLower === '5030008019' ||
+    idLower === '5537029307' ||
+    labelLower.includes('committed') ||
+    labelLower.includes('decision maker')
+  ) {
+    return true;
+  }
+
+  // Contract Sent
+  if (
+    idLower === 'contractsent' ||
+    idLower === '5030008020' ||
+    idLower === '2181144790' ||
+    idLower === '5537029308' ||
+    labelLower.includes('contract sent') ||
+    labelLower.includes('agreement sent')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+

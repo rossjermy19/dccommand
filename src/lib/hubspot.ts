@@ -1,4 +1,4 @@
-import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage } from './types';
+import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage, isActivelyClosingStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
@@ -467,10 +467,18 @@ export async function getOpenDeals(): Promise<Deal[]> {
                           stageLabelLower.includes('back burner') ||
                           stageLabelLower.includes('backburner');
 
+    const currentStageLabel = stageLabels[props.dealstage] || STAGE_LABELS[props.dealstage] || props.dealstage || '';
+    const isActivelyClosing = isActivelyClosingStage(props.dealstage, currentStageLabel);
+
     if (isClosedWon) {
       // Closed Won deals are closed successfully
       health = 'healthy';
       healthReason = 'Deal Won! Closed successfully.';
+    } else if (isActivelyClosing) {
+      // Actively working on closing (Expected to Close, Upside, Committed, Contract Sent):
+      // Exempt from daily desk alerts and inactivity surfacing.
+      health = 'snoozed';
+      healthReason = `Active closing stage (${currentStageLabel}) — actively working`;
     } else if (taskDueToday) {
       // 1. Task due TODAY -> Immediate alert on Daily Desk Command!
       health = 'warning';

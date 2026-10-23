@@ -11,7 +11,7 @@ import { TranscriptIntelligenceModal } from '@/components/TranscriptIntelligence
 import { AlignedStoryModal } from '@/components/AlignedStoryModal';
 import { FollowUpModal } from '@/components/FollowUpModal';
 import { DealDrawer } from '@/components/DealDrawer';
-import { Deal } from '@/lib/types';
+import { Deal, isActivelyClosingStage } from '@/lib/types';
 import { 
   Flame, 
   Layers, 
@@ -183,9 +183,12 @@ export default function DashboardPage() {
     return deals.filter((d) => d.hasAlignedRoom || d.tags?.includes('Aligned Room')).length;
   }, [deals]);
 
-  // Compute pending missions count for the badge
+  // Compute pending missions count for the badge (excluding active closing stages)
   const pendingMissionsCount = useMemo(() => {
-    return deals.filter((d) => d.health === 'urgent' || d.health === 'warning').length;
+    return deals.filter((d) => {
+      if (isActivelyClosingStage(d.stage, d.stageLabel)) return false;
+      return d.health === 'urgent' || d.health === 'warning';
+    }).length;
   }, [deals]);
 
   // Dynamic KPI stats: reactive to deal updates and Gold VIP tags

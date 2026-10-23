@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Deal } from '@/lib/types';
+import { Deal, isActivelyClosingStage } from '@/lib/types';
 import { 
   Trophy, 
   Sparkles, 
@@ -79,6 +79,12 @@ export function DailyMissionControl({
     deals.forEach((deal) => {
       // Ignore Closed Won deals for daily missions
       if (deal.stage === 'closedwon' || deal.stage === '5030008021' || deal.stageLabel.toLowerCase().includes('closed won')) {
+        return;
+      }
+
+      // Never surface deals in active closing stages (Expected to Close, Upside, Committed, Contract Sent)
+      // Ross is already actively working on them
+      if (isActivelyClosingStage(deal.stage, deal.stageLabel)) {
         return;
       }
 
