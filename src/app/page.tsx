@@ -11,7 +11,7 @@ import { TranscriptIntelligenceModal } from '@/components/TranscriptIntelligence
 import { AlignedStoryModal } from '@/components/AlignedStoryModal';
 import { FollowUpModal } from '@/components/FollowUpModal';
 import { DealDrawer } from '@/components/DealDrawer';
-import { Deal, isActivelyClosingStage } from '@/lib/types';
+import { Deal, isActivelyClosingStage, isClosedWonStage } from '@/lib/types';
 import { 
   Flame, 
   Layers, 
@@ -183,34 +183,46 @@ export default function DashboardPage() {
     return deals.filter((d) => d.hasAlignedRoom || d.tags?.includes('Aligned Room')).length;
   }, [deals]);
 
-  // Compute pending missions count for the badge (excluding active closing stages)
+  // Compute pending missions count for the badge (excluding closed won and active closing stages)
   const pendingMissionsCount = useMemo(() => {
     return deals.filter((d) => {
+      if (d.isClosedWon || isClosedWonStage(d.stage, d.stageLabel)) return false;
       if (isActivelyClosingStage(d.stage, d.stageLabel)) return false;
       return d.health === 'urgent' || d.health === 'warning';
     }).length;
   }, [deals]);
 
-  // Dynamic KPI stats: reactive to deal updates and Gold VIP tags
+  // Dynamic KPI stats: reactive to deal updates, open pipeline, and won deals
   const kpiStats = useMemo(() => {
-    const goldDeals = deals.filter((d) => d.isGold || d.tags?.includes('High Chance'));
+    const openDeals = deals.filter(
+      (d) => !d.isClosedWon && !isClosedWonStage(d.stage, d.stageLabel)
+    );
+    const wonDeals = deals.filter(
+      (d) => d.isClosedWon || isClosedWonStage(d.stage, d.stageLabel)
+    );
+
+    const goldDeals = openDeals.filter((d) => d.isGold || d.tags?.includes('High Chance'));
     const goldPipelineValue = goldDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
-    const totalPipelineValue = deals.reduce((sum, d) => sum + (d.amount || 0), 0);
-    const actionDueCount = deals.filter((d) => d.health === 'warning' || d.health === 'urgent').length;
-    const snoozedCount = deals.filter((d) => d.health === 'snoozed').length;
-    const healthyCount = deals.filter((d) => d.health === 'healthy').length;
+    const openPipelineValue = openDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+    const wonPipelineValue = wonDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+    const actionDueCount = openDeals.filter((d) => d.health === 'warning' || d.health === 'urgent').length;
+    const snoozedCount = openDeals.filter((d) => d.health === 'snoozed').length;
+    const healthyCount = openDeals.filter((d) => d.health === 'healthy').length;
 
     return {
-      totalDeals: deals.length,
-      totalPipelineValue: stats.totalPipelineValue || totalPipelineValue,
-      urgentCount: deals.filter((d) => d.health === 'urgent').length,
+      totalDeals: openDeals.length,
+      totalPipelineValue: openPipelineValue,
+      urgentCount: openDeals.filter((d) => d.health === 'urgent').length,
       warningCount: actionDueCount,
       healthyCount,
       snoozedCount,
       goldCount: goldDeals.length,
       goldPipelineValue,
+      wonCount: wonDeals.length,
+      wonPipelineValue,
     };
-  }, [deals, stats.totalPipelineValue]);
+  }, [deals]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">

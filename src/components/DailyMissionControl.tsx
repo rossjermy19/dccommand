@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Deal, isActivelyClosingStage } from '@/lib/types';
+import { Deal, isActivelyClosingStage, isClosedWonStage } from '@/lib/types';
 import { 
   Trophy, 
   Sparkles, 
@@ -78,7 +78,13 @@ export function DailyMissionControl({
 
     deals.forEach((deal) => {
       // Ignore Closed Won deals for daily missions
-      if (deal.stage === 'closedwon' || deal.stage === '5030008021' || deal.stageLabel.toLowerCase().includes('closed won')) {
+      if (
+        deal.isClosedWon ||
+        isClosedWonStage(deal.stage, deal.stageLabel) ||
+        deal.stage === 'closedwon' ||
+        deal.stage === '5030008021' ||
+        deal.stageLabel.toLowerCase().includes('closed won')
+      ) {
         return;
       }
 

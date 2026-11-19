@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Deal } from '@/lib/types';
+import { Deal, isClosedWonStage } from '@/lib/types';
 import { CompactDealCard } from './CompactDealCard';
 import { Layers, Zap, CheckCircle2 } from 'lucide-react';
 
@@ -65,8 +65,8 @@ export const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
     id: 'closed_won',
     label: 'Closed Won',
     isClosedWon: true,
-    badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold',
-    columnClass: 'bg-emerald-50/25 border-emerald-200',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold',
+    columnClass: 'bg-emerald-50/40 border-emerald-300/80 ring-1 ring-emerald-200/60 shadow-2xs',
   },
 ];
 
@@ -89,7 +89,22 @@ export function getDealPipelineColumnId(deal: Deal): string | null {
     return null;
   }
 
-  // 2. Handed back to Liberty J -> Dedicated "Liberty J" column between Contact Made and No Response
+  // 2. Closed Won -> Dedicated "Closed Won" column in the green
+  if (
+    deal.isClosedWon ||
+    isClosedWonStage(deal.stage, deal.stageLabel) ||
+    stageId === 'closedwon' ||
+    stageId === '5030008021' ||
+    stageId === '2181144791' ||
+    stageId === '5537029309' ||
+    stageLabel.includes('closed won') ||
+    stageLabel.includes('agreement signed') ||
+    stageLabel === 'won'
+  ) {
+    return 'closed_won';
+  }
+
+  // 3. Handed back to Liberty J -> Dedicated "Liberty J" column between Contact Made and No Response
   if (deal.isBackWithLibertyJ) {
     return 'liberty_j';
   }
@@ -486,11 +501,14 @@ export function StageBoard({
                         </h3>
                       </div>
                     ) : col.isClosedWon ? (
-                      <div className="flex items-center space-x-1 truncate text-emerald-800">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider truncate">
+                      <div className="flex items-center space-x-1.5 truncate text-emerald-800">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <h3 className="text-xs font-black uppercase tracking-wider truncate text-emerald-950">
                           {col.label}
                         </h3>
+                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-200/90 text-emerald-950 border border-emerald-300 shadow-2xs">
+                          Won 🎉
+                        </span>
                       </div>
                     ) : (
                       <h3
@@ -542,7 +560,13 @@ export function StageBoard({
 
                 {col.deals.length === 0 && !isDropTarget ? (
                   <div className="h-28 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 rounded-xl text-[11px] text-slate-400 p-3">
-                    <span>No deals in this stage</span>
+                    {col.isClosedWon ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <span>Drop won deals here to celebrate! 🎉</span>
+                      </span>
+                    ) : (
+                      <span>No deals in this stage</span>
+                    )}
                     {col.isLibertyJ && (
                       <span className="text-[10px] text-teal-600 mt-1">
                         Drop deals here to assign to Liberty J

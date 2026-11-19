@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Deal } from '@/lib/types';
+import { Deal, isClosedWonStage } from '@/lib/types';
 import { 
   Flame, 
   CalendarCheck,
@@ -36,6 +36,9 @@ export function RadarView({
   // Apply Tag and Search filter
   const baseDeals = useMemo(() => {
     return deals.filter((d) => {
+      // Exclude Closed Won from Action Radar (under control in won stage)
+      if (d.isClosedWon || isClosedWonStage(d.stage, d.stageLabel)) return false;
+
       // KPI filter
       if (activeFilter === 'gold' && !d.isGold && !d.tags?.includes('High Chance')) return false;
 

@@ -1,4 +1,4 @@
-import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage, isActivelyClosingStage } from './types';
+import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PipelineStage, isActivelyClosingStage, isClosedWonStage } from './types';
 import { getCustomTagsMap, saveCustomTag } from './tags';
 import { getAlignedStoriesMap } from './aligned';
 import { getLibertyJStatusMap, syncLibertyJStatusFromHubSpot } from './liberty-j';
@@ -99,11 +99,6 @@ export async function getOpenDeals(): Promise<Deal[]> {
       {
         propertyName: 'dealstage',
         operator: 'NEQ',
-        value: 'closedwon',
-      },
-      {
-        propertyName: 'dealstage',
-        operator: 'NEQ',
         value: '5030008022',
       },
       {
@@ -163,10 +158,34 @@ export async function getOpenDeals(): Promise<Deal[]> {
   }
 
   const data = await response.json();
-  const allResults = data.results || [];
+  const allResults = [...(data.results || [])];
+
+  // Fetch subsequent pages if more than 100 deals exist
+  let nextAfter = data.paging?.next?.after;
+  while (nextAfter) {
+    const nextRes = await hubspotSearchFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...searchBody,
+        after: nextAfter,
+      }),
+      cache: 'no-store',
+    });
+    if (!nextRes.ok) break;
+    const nextData = await nextRes.json();
+    if (nextData.results?.length) {
+      allResults.push(...nextData.results);
+    }
+    nextAfter = nextData.paging?.next?.after;
+  }
+
   const now = new Date().getTime();
 
-  // Strictly filter out ANY Closed Lost, Closed Won deals, or non-default pipeline deals
+  // Filter out Closed Lost deals or non-default pipeline deals (Closed Won deals are included!)
   const rawDeals = allResults.filter((item: any) => {
     const stageId = (item.properties?.dealstage || '').toLowerCase();
     const stageLabel = (stageLabels[stageId] || STAGE_LABELS[stageId] || '').toLowerCase();
@@ -175,9 +194,6 @@ export async function getOpenDeals(): Promise<Deal[]> {
       return false;
     }
     if (stageId === 'closedlost' || stageId === '5030008022' || stageId.includes('lost') || stageLabel.includes('lost')) {
-      return false;
-    }
-    if (stageId === 'closedwon' || stageLabel.includes('won')) {
       return false;
     }
     return true;
@@ -459,7 +475,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
 
     const stageIdLower = (props.dealstage || '').toLowerCase();
     const stageLabelLower = (stageLabels[props.dealstage] || STAGE_LABELS[props.dealstage] || '').toLowerCase();
-    const isClosedWon = stageIdLower === 'closedwon' || stageIdLower === '5030008021' || stageLabelLower.includes('closed won');
+    const isClosedWon = isClosedWonStage(props.dealstage, stageLabelLower) || stageIdLower === 'closedwon' || stageIdLower === '5030008021' || stageLabelLower.includes('closed won');
     const isBackBurning = stageIdLower === '1638150379' ||
                           stageIdLower === '5030008012' ||
                           stageIdLower === '5536133318' ||
@@ -594,6 +610,7 @@ export async function getOpenDeals(): Promise<Deal[]> {
       goldDate,
       hasAlignedRoom,
       alignedRoomDate,
+      isClosedWon,
     };
   });
 }

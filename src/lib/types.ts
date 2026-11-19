@@ -86,6 +86,7 @@ export interface Deal {
   goldDate?: string | null;
   hasAlignedRoom?: boolean;
   alignedRoomDate?: string | null;
+  isClosedWon?: boolean;
 }
 
 export interface PipelineStage {
@@ -176,4 +177,23 @@ export function isActivelyClosingStage(stageId: string = '', stageLabel: string 
 
   return false;
 }
+
+/**
+ * Checks whether a deal stage corresponds to Closed Won.
+ */
+export function isClosedWonStage(stageId: string = '', stageLabel: string = ''): boolean {
+  const idLower = (stageId || '').toLowerCase().trim();
+  const labelLower = (stageLabel || '').toLowerCase().trim();
+
+  return (
+    idLower === 'closedwon' ||
+    idLower === '5030008021' ||
+    idLower === '2181144791' ||
+    idLower === '5537029309' ||
+    labelLower.includes('closed won') ||
+    labelLower.includes('agreement signed') ||
+    labelLower === 'won'
+  );
+}
+
 

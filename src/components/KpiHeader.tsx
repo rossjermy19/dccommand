@@ -13,6 +13,8 @@ interface KpiHeaderProps {
     snoozedCount?: number;
     goldCount?: number;
     goldPipelineValue?: number;
+    wonCount?: number;
+    wonPipelineValue?: number;
   };
   filter: string;
   onSelectFilter: (filter: string) => void;
@@ -53,7 +55,10 @@ export function KpiHeader({ stats, filter, onSelectFilter }: KpiHeaderProps) {
           </div>
           <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{formattedPipelineValue}</div>
           <div className="flex items-center justify-between mt-1 text-[10.5px] sm:text-[11px] text-slate-500 font-medium">
-            <span>{stats.totalDeals} open deals</span>
+            <span>
+              {stats.totalDeals} open deals
+              {stats.wonCount ? ` • ${stats.wonCount} won` : ''}
+            </span>
             {filter === 'all' && (
               <span className="text-[9.5px] sm:text-[10px] text-blue-700 font-bold bg-blue-100/80 px-1.5 py-0.5 rounded">All Shown</span>
             )}

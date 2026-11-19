@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PIPELINE_STAGES } from '@/lib/types';
+import { Deal, DealContact, DealNote, DealTask, DealEmail, DealMeeting, DealCall, PIPELINE_STAGES, isClosedWonStage } from '@/lib/types';
 import { DealTagBadge } from './DealTagBadge';
 import { CloseMonthSelector } from './CloseMonthSelector';
 import { ClosedLostModal } from './ClosedLostModal';
@@ -137,6 +137,8 @@ export function DealDrawer({
 
   const [hasAlignedRoom, setHasAlignedRoom] = useState(!!deal?.hasAlignedRoom);
   const [isTogglingAlignedRoom, setIsTogglingAlignedRoom] = useState(false);
+
+  const isWon = isClosedWonStage(currentStage) || (deal ? !!deal.isClosedWon || isClosedWonStage(deal.stage, deal.stageLabel) : false);
 
   useEffect(() => {
     setHasAlignedRoom(!!deal?.hasAlignedRoom);
@@ -558,6 +560,30 @@ export function DealDrawer({
                     >
                       Unmark
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Closed Won Celebration Banner (In the green & in a happy place) */}
+              {isWon && (
+                <div className="mt-3 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-emerald-500/15 via-teal-500/20 to-emerald-500/10 border border-emerald-300 flex items-center justify-between gap-2.5 shadow-2xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                      <CheckCircle2 className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-emerald-950 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                        <span>Deal Won & Closed Successfully! 🎉</span>
+                        <span className="text-[10px] font-bold bg-emerald-200/90 text-emerald-950 px-1.5 py-0.2 rounded border border-emerald-300">
+                          Won
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-emerald-800 font-medium">
+                        {deal.closeDate
+                          ? `Secured on ${new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Logged and stored in HubSpot CRM.`
+                          : 'Deal secured and logged in HubSpot CRM.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

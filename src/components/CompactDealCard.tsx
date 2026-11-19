@@ -38,6 +38,14 @@ export function CompactDealCard({
   const [hasAlignedRoom, setHasAlignedRoom] = useState(!!deal.hasAlignedRoom);
   const [isTogglingAlignedRoom, setIsTogglingAlignedRoom] = useState(false);
 
+  const isWon = !!(
+    deal.isClosedWon ||
+    deal.stage === 'closedwon' ||
+    deal.stage === '5030008021' ||
+    deal.stageLabel?.toLowerCase().includes('closed won') ||
+    deal.stageLabel?.toLowerCase() === 'won'
+  );
+
   useEffect(() => {
     setIsGold(!!deal.isGold);
   }, [deal.isGold]);
@@ -159,6 +167,14 @@ export function CompactDealCard({
         );
       case 'healthy':
       default:
+        if (isWon) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
+              <CheckCircle2 className="h-2.5 w-2.5 text-emerald-700" />
+              <span>Closed Won 🎉</span>
+            </span>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
             <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
@@ -174,6 +190,8 @@ export function CompactDealCard({
       className={`group relative border shadow-2xs hover:shadow-md rounded-xl p-3 sm:p-3.5 transition flex flex-col justify-between cursor-pointer space-y-2.5 ${
         isGold
           ? 'border-amber-400 bg-gradient-to-br from-amber-50/95 via-yellow-50/70 to-amber-100/60 ring-2 ring-amber-400/60 shadow-md shadow-amber-500/20 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/30'
+          : isWon
+          ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/90 via-green-50/50 to-emerald-100/40 ring-1 ring-emerald-300/80 shadow-xs hover:border-emerald-400 hover:shadow-md'
           : deal.isBackWithLibertyJ
           ? 'bg-white hover:bg-slate-50/50 border-teal-300 hover:border-teal-400 ring-1 ring-teal-200/50'
           : hasAlignedRoom
@@ -194,8 +212,21 @@ export function CompactDealCard({
         </div>
       )}
 
-      {/* Top Banner if Back with Liberty J (only if not already Gold) */}
-      {!isGold && deal.isBackWithLibertyJ && (
+      {/* Top Banner if Closed Won (in the green and in a happy place) */}
+      {!isGold && isWon && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white -mx-3 sm:-mx-3.5 -mt-3 sm:-mt-3.5 px-3 py-1.5 rounded-t-xl border-b border-emerald-600 flex items-center justify-between shadow-xs">
+          <div className="flex items-center space-x-1.5 font-black text-[10.5px] uppercase tracking-wider">
+            <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+            <span>Closed Won • Deal Secured!</span>
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-wider bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/30">
+            Won 🎉
+          </span>
+        </div>
+      )}
+
+      {/* Top Banner if Back with Liberty J (only if not already Gold or Won) */}
+      {!isGold && !isWon && deal.isBackWithLibertyJ && (
         <div className="bg-gradient-to-r from-teal-500/15 via-emerald-500/10 to-teal-500/5 -mx-3 sm:-mx-3.5 -mt-3 sm:-mt-3.5 px-3 py-1.5 rounded-t-xl border-b border-teal-200/80 flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <div className="h-4 w-7 bg-white rounded border border-teal-200 p-0.5 flex items-center justify-center shrink-0 shadow-2xs">
@@ -283,6 +314,8 @@ export function CompactDealCard({
           <span className={`text-xs sm:text-sm font-bold font-mono px-1.5 py-0.5 rounded tracking-tight ${
             isGold
               ? 'text-amber-950 bg-amber-200/90 border border-amber-400 font-extrabold shadow-2xs'
+              : isWon
+              ? 'text-emerald-950 bg-emerald-100 border border-emerald-300 font-extrabold shadow-2xs'
               : 'text-emerald-800 bg-emerald-50 border border-emerald-200/60'
           }`}>
             {formattedAmount}
@@ -300,9 +333,13 @@ export function CompactDealCard({
           variant="card"
         />
         
-        {/* Days since contact */}
+        {/* Days since contact or Won close date */}
         <span className="text-[10px] text-slate-500 font-medium shrink-0">
-          {deal.daysSinceContact === 0 ? (
+          {isWon && deal.closeDate ? (
+            <span className="text-emerald-700 font-bold">
+              Closed {new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </span>
+          ) : deal.daysSinceContact === 0 ? (
             <span className="text-emerald-700 font-bold">Today</span>
           ) : deal.daysSinceContact !== null ? (
             `${deal.daysSinceContact}d ago`
