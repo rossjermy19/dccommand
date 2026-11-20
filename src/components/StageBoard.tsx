@@ -381,7 +381,7 @@ export function StageBoard({
     });
   }, [deals, activeFilter, selectedTagFilter, searchQuery]);
 
-  // Group filtered deals into the 11 ordered pipeline columns
+  // Group filtered deals into the 12 ordered pipeline columns
   const stageColumns = useMemo(() => {
     const dealsByColumn: Record<string, Deal[]> = {};
     PIPELINE_COLUMNS.forEach((col) => {
@@ -395,8 +395,29 @@ export function StageBoard({
       }
     });
 
+    const currentYear = new Date().getFullYear();
+
     return PIPELINE_COLUMNS.map((col) => {
-      const colDeals = dealsByColumn[col.id] || [];
+      let colDeals = dealsByColumn[col.id] || [];
+
+      // For Closed Won column only:
+      // 1. Only show deals won in the active calendar/financial year (1 Jan - 31 Dec of current year)
+      //    (Deals won in previous years are excluded, resetting automatically every 1 Jan)
+      // 2. Sort in reverse chronological order (newest won deals at the very top, descending back towards January)
+      if (col.id === 'closed_won' || col.isClosedWon) {
+        colDeals = colDeals.filter((d) => {
+          const dateStr = d.closeDate || d.lastModifiedDate;
+          if (!dateStr) return false;
+          return new Date(dateStr).getFullYear() === currentYear;
+        });
+
+        colDeals.sort((a, b) => {
+          const timeA = new Date(a.closeDate || a.lastModifiedDate || 0).getTime();
+          const timeB = new Date(b.closeDate || b.lastModifiedDate || 0).getTime();
+          return timeB - timeA;
+        });
+      }
+
       const totalValue = colDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
       const needsKickCount = col.isLibertyJ
         ? colDeals.filter((d) => (d.daysWithLibertyJ || 0) >= 7).length

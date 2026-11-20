@@ -192,14 +192,18 @@ export default function DashboardPage() {
     }).length;
   }, [deals]);
 
-  // Dynamic KPI stats: reactive to deal updates, open pipeline, and won deals
+  // Dynamic KPI stats: reactive to deal updates, open pipeline, and won deals (active year only)
   const kpiStats = useMemo(() => {
+    const currentYear = new Date().getFullYear();
     const openDeals = deals.filter(
       (d) => !d.isClosedWon && !isClosedWonStage(d.stage, d.stageLabel)
     );
-    const wonDeals = deals.filter(
-      (d) => d.isClosedWon || isClosedWonStage(d.stage, d.stageLabel)
-    );
+    const wonDeals = deals.filter((d) => {
+      if (!d.isClosedWon && !isClosedWonStage(d.stage, d.stageLabel)) return false;
+      const dateStr = d.closeDate || d.lastModifiedDate;
+      if (!dateStr) return false;
+      return new Date(dateStr).getFullYear() === currentYear;
+    });
 
     const goldDeals = openDeals.filter((d) => d.isGold || d.tags?.includes('High Chance'));
     const goldPipelineValue = goldDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
