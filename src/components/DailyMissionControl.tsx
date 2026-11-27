@@ -20,7 +20,10 @@ import {
   Filter,
   Archive,
   RotateCcw,
-  Copy
+  Copy,
+  Bell,
+  Send,
+  Plus
 } from 'lucide-react';
 import { DealTagBadge } from './DealTagBadge';
 import { ClosedLostModal } from './ClosedLostModal';
@@ -45,6 +48,27 @@ interface MissionItem {
   urgency: 'high' | 'medium' | 'low';
 }
 
+const getOffsetDateString = (daysAhead: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatGbDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export function DailyMissionControl({
   deals,
   onSelectDeal,
@@ -62,6 +86,13 @@ export function DailyMissionControl({
   const [schedulingDealId, setSchedulingDealId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string>('');
   const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
+
+  // Inline Quick Add Note + Reminder state (7-day reminder vs custom future calendar date)
+  const [notingMissionId, setNotingMissionId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState<string>('');
+  const [noteReminderMode, setNoteReminderMode] = useState<'7days' | 'custom' | 'none'>('7days');
+  const [noteReminderDate, setNoteReminderDate] = useState<string>(() => getOffsetDateString(14));
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false);
   const [closedLostDeal, setClosedLostDeal] = useState<Deal | null>(null);
   const [libertyJModalDeal, setLibertyJModalDeal] = useState<Deal | null>(null);
   const [libertyJModalMode, setLibertyJModalMode] = useState<'push' | 'kick' | 'recall'>('push');
@@ -190,30 +221,103 @@ export function DailyMissionControl({
     }, 250);
   };
 
-  // 1-Click quick schedule follow-up task directly in HubSpot
-  const handleQuickSchedule = async (deal: Deal, targetDateStr: string, subject: string) => {
+  // 1-Click quick schedule follow-up task directly in HubSpot (completes old due-today/overdue reminders)
+  const handleQuickSchedule = async (
+    mission: MissionItem,
+    targetDateStr: string,
+    isSevenDay: boolean = false
+  ) => {
     if (!targetDateStr || isSubmittingSchedule) return;
     setIsSubmittingSchedule(true);
     try {
+      const subject = isSevenDay
+        ? `7-Day Check: Follow up with ${mission.deal.name}`
+        : `Scheduled Reminder: Follow up with ${mission.deal.name}`;
+      const body = isSevenDay
+        ? `7-day reminder scheduled from Daily Clear-Desk Command.`
+        : `Calendar reminder scheduled from Daily Clear-Desk Command for ${formatGbDate(targetDateStr)}.`;
+
       const res = await fetch('/api/hubspot/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dealId: deal.id,
-          subject: subject || `Follow-up with ${deal.name}`,
+          dealId: mission.deal.id,
+          subject,
+          body,
           dueDate: targetDateStr,
+          priority: 'HIGH',
+          completeExistingReminders: true,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        clearMission(`stalled_${deal.id}`);
+        clearMission(mission.id);
         setSchedulingDealId(null);
         onRefreshDeals();
       }
     } catch (err) {
-      console.error('Failed to schedule task:', err);
+      console.error('Failed to schedule reminder task:', err);
     } finally {
       setIsSubmittingSchedule(false);
+    }
+  };
+
+  // Inline Add Note + 7-day or custom future calendar date reminder directly from Daily Clear-Desk Command
+  const handleQuickAddNote = async (mission: MissionItem) => {
+    if (!noteText.trim() || isSubmittingNote) return;
+    if (noteReminderMode === 'custom' && !noteReminderDate) return;
+
+    setIsSubmittingNote(true);
+    try {
+      const noteRes = await fetch('/api/hubspot/note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealId: mission.deal.id,
+          noteBody: noteText.trim(),
+          completeFutureReminders: noteReminderMode !== 'none',
+        }),
+      });
+      const noteData = await noteRes.json();
+      if (!noteData.success) throw new Error(noteData.error || 'Failed to save note');
+
+      if (noteReminderMode === '7days') {
+        const due7Days = getOffsetDateString(7);
+        await fetch('/api/hubspot/task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dealId: mission.deal.id,
+            subject: `7-Day Check: Follow up on note for ${mission.deal.name}`,
+            body: `Auto-scheduled 7-day review after note: "${noteText.trim().slice(0, 120)}${noteText.trim().length > 120 ? '...' : ''}"`,
+            dueDate: due7Days,
+            priority: 'HIGH',
+          }),
+        });
+      } else if (noteReminderMode === 'custom' && noteReminderDate) {
+        await fetch('/api/hubspot/task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dealId: mission.deal.id,
+            subject: `Scheduled Reminder: Follow up on note for ${mission.deal.name}`,
+            body: `Scheduled follow-up for ${formatGbDate(noteReminderDate)} after note: "${noteText.trim().slice(0, 120)}${noteText.trim().length > 120 ? '...' : ''}"`,
+            dueDate: noteReminderDate,
+            priority: 'HIGH',
+          }),
+        });
+      }
+
+      clearMission(mission.id);
+      setNotingMissionId(null);
+      setNoteText('');
+      setNoteReminderMode('7days');
+      setNoteReminderDate(getOffsetDateString(14));
+      onRefreshDeals();
+    } catch (err) {
+      console.error('Failed to add note and reminder:', err);
+    } finally {
+      setIsSubmittingNote(false);
     }
   };
 
@@ -678,43 +782,51 @@ export function DailyMissionControl({
                       <span>Draft Email</span>
                     </button>
 
-                    {/* Resolution Action 3: Quick Plan / Schedule */}
-                    {schedulingDealId === mission.deal.id ? (
-                      <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
-                        <input
-                          type="date"
-                          value={scheduleDate}
-                          onChange={(e) => setScheduleDate(e.target.value)}
-                          className="bg-slate-50 border border-slate-200 text-slate-900 text-xs px-2 py-1 rounded"
-                        />
-                        <button
-                          onClick={() => handleQuickSchedule(mission.deal, scheduleDate, `Follow-up with ${mission.deal.name}`)}
-                          disabled={!scheduleDate || isSubmittingSchedule}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-xs font-bold"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setSchedulingDealId(null)}
-                          className="text-slate-400 hover:text-slate-600 px-1 text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + 7);
-                          setScheduleDate(d.toISOString().split('T')[0]);
+                    {/* Resolution Action 2b: Inline Add Note + Reminder (7d or Calendar Date) */}
+                    <button
+                      onClick={() => {
+                        if (notingMissionId === mission.id) {
+                          setNotingMissionId(null);
+                        } else {
+                          setSchedulingDealId(null);
+                          setNotingMissionId(mission.id);
+                          setNoteText('');
+                          setNoteReminderMode('7days');
+                          setNoteReminderDate(getOffsetDateString(14));
+                        }
+                      }}
+                      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                        notingMissionId === mission.id
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300'
+                      }`}
+                      title="Add a note and set a 7-day reminder or custom future calendar date"
+                    >
+                      <Plus className={`h-3.5 w-3.5 ${notingMissionId === mission.id ? 'text-white' : 'text-blue-600'}`} />
+                      <span>Add Note</span>
+                    </button>
+
+                    {/* Resolution Action 3: Quick Remind / Schedule (7-Day or Future Calendar Date) */}
+                    <button
+                      onClick={() => {
+                        if (schedulingDealId === mission.deal.id) {
+                          setSchedulingDealId(null);
+                        } else {
+                          setNotingMissionId(null);
+                          setScheduleDate(getOffsetDateString(14));
                           setSchedulingDealId(mission.deal.id);
-                        }}
-                        className="flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 transition"
-                      >
-                        <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-                        <span>Plan Follow-up</span>
-                      </button>
-                    )}
+                        }
+                      }}
+                      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
+                        schedulingDealId === mission.deal.id
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white hover:bg-indigo-50 text-slate-700 border-slate-200'
+                      }`}
+                      title="Snooze deal with a 7-day reminder or pick a future calendar date"
+                    >
+                      <Calendar className={`h-3.5 w-3.5 ${schedulingDealId === mission.deal.id ? 'text-white' : 'text-indigo-600'}`} />
+                      <span>Set Reminder</span>
+                    </button>
 
                     {/* Resolution Action 4: Quick Mark Meeting Booked in HubSpot */}
                     <button
@@ -804,6 +916,213 @@ export function DailyMissionControl({
                     <Check className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* Inline Panel: Add Note + Choose 7-Day Reminder or Future Calendar Date */}
+                {notingMissionId === mission.id && (
+                  <div className="pt-3 border-t border-slate-200 space-y-2.5 bg-slate-50/90 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 px-4 sm:px-5 pb-4 rounded-b-xl">
+                    <textarea
+                      rows={3}
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder={`Add a note for ${mission.deal.name}...`}
+                      autoFocus
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                        <Bell className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Remind me:</span>
+                      </span>
+                      <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setNoteReminderMode('7days')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                            noteReminderMode === '7days'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          7-Day Reminder
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNoteReminderMode('custom')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1 ${
+                            noteReminderMode === 'custom'
+                              ? 'bg-indigo-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Calendar className="h-3 w-3" />
+                          <span>Calendar Date</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNoteReminderMode('none')}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
+                            noteReminderMode === 'none'
+                              ? 'bg-slate-700 text-white shadow-2xs'
+                              : 'text-slate-500 hover:bg-slate-100'
+                          }`}
+                        >
+                          None
+                        </button>
+                      </div>
+                    </div>
+
+                    {noteReminderMode === 'custom' && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <input
+                            type="date"
+                            min={getOffsetDateString(1)}
+                            value={noteReminderDate}
+                            onChange={(e) => setNoteReminderDate(e.target.value)}
+                            className="bg-white border border-indigo-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          />
+                          {[
+                            { label: '+2 Weeks', days: 14 },
+                            { label: '+1 Month', days: 30 },
+                            { label: '+3 Months', days: 90 },
+                          ].map((preset) => {
+                            const val = getOffsetDateString(preset.days);
+                            return (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => setNoteReminderDate(val)}
+                                className={`px-2 py-1 rounded-md text-[10.5px] font-bold border transition ${
+                                  noteReminderDate === val
+                                    ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {noteReminderDate && (
+                          <p className="text-[11px] text-indigo-800 font-medium">
+                            Won&apos;t remind you again until <span className="font-bold">{formatGbDate(noteReminderDate)}</span>.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {noteReminderMode === '7days' && (
+                      <p className="text-[11px] text-slate-600">
+                        Will remind you again on <span className="font-bold text-slate-800">{formatGbDate(getOffsetDateString(7))}</span>.
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setNotingMissionId(null)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddNote(mission)}
+                        disabled={isSubmittingNote || !noteText.trim() || (noteReminderMode === 'custom' && !noteReminderDate)}
+                        className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-2xs transition disabled:opacity-50"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>
+                          {isSubmittingNote
+                            ? 'Saving...'
+                            : noteReminderMode === 'custom' && noteReminderDate
+                            ? `Save & Remind ${formatGbDate(noteReminderDate).split(', ')[1] || noteReminderDate}`
+                            : noteReminderMode === '7days'
+                            ? 'Save & Remind in 7d'
+                            : 'Save Note'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline Panel: Quick Reminder (7-Day or Future Calendar Date without Note) */}
+                {schedulingDealId === mission.deal.id && (
+                  <div className="pt-3 border-t border-indigo-200/80 space-y-2.5 bg-indigo-50/50 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 px-4 sm:px-5 pb-4 rounded-b-xl">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
+                        <Bell className="h-3.5 w-3.5 text-indigo-600" />
+                        <span>Snooze until reminder date</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickSchedule(mission, getOffsetDateString(7), true)}
+                        disabled={isSubmittingSchedule}
+                        className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-2xs transition disabled:opacity-50"
+                      >
+                        <Clock className="h-3 w-3" />
+                        <span>7-Day Reminder ({formatGbDate(getOffsetDateString(7)).split(', ')[1]})</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <input
+                        type="date"
+                        min={getOffsetDateString(1)}
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        className="bg-white border border-indigo-300 text-slate-900 text-xs font-semibold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                      {[
+                        { label: '+2 Weeks', days: 14 },
+                        { label: '+1 Month', days: 30 },
+                        { label: '+3 Months', days: 90 },
+                      ].map((preset) => {
+                        const val = getOffsetDateString(preset.days);
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setScheduleDate(val)}
+                            className={`px-2 py-1 rounded-md text-[10.5px] font-bold border transition ${
+                              scheduleDate === val
+                                ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+                      <p className="text-[11px] text-indigo-900/80 font-medium">
+                        {scheduleDate
+                          ? <>Won&apos;t remind you again until <span className="font-bold text-indigo-950">{formatGbDate(scheduleDate)}</span>.</>
+                          : 'Pick a future calendar date to snooze this deal.'}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSchedulingDealId(null)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-white/70 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickSchedule(mission, scheduleDate, false)}
+                          disabled={!scheduleDate || isSubmittingSchedule}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-2xs transition disabled:opacity-50"
+                        >
+                          {isSubmittingSchedule ? 'Saving...' : 'Set Calendar Date'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

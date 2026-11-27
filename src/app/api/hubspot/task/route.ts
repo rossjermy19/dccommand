@@ -3,7 +3,7 @@ import { createDealTask, updateDealTask } from '@/lib/hubspot';
 
 export async function POST(req: Request) {
   try {
-    const { dealId, subject, body, dueDate, priority } = await req.json();
+    const { dealId, subject, body, dueDate, priority, completeExistingReminders } = await req.json();
 
     if (!dealId || !subject || !dueDate) {
       return NextResponse.json(
@@ -17,6 +17,7 @@ export async function POST(req: Request) {
       body,
       dueDate,
       priority: priority || 'HIGH',
+      completeExistingReminders: !!completeExistingReminders,
     });
 
     return NextResponse.json({ success: true, task });

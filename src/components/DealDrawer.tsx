@@ -41,6 +41,27 @@ interface DealDrawerProps {
   onMoveDealStage?: (dealId: string, newStage: string, newStageLabel?: string, isLibertyJ?: boolean) => void;
 }
 
+const getOffsetDateString = (daysAhead: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatGbDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export function DealDrawer({
   deal,
   onClose,
@@ -66,7 +87,8 @@ export function DealDrawer({
   // New Note Form
   const [showAddNote, setShowAddNote] = useState(false);
   const [newNoteBody, setNewNoteBody] = useState('');
-  const [autoRemindIn7Days, setAutoRemindIn7Days] = useState(true);
+  const [noteReminderMode, setNoteReminderMode] = useState<'7days' | 'custom' | 'none'>('7days');
+  const [noteReminderDate, setNoteReminderDate] = useState<string>(() => getOffsetDateString(14));
   const [isSavingNote, setIsSavingNote] = useState(false);
 
   // New Task Form
@@ -275,35 +297,54 @@ export function DealDrawer({
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteBody.trim()) return;
+    if (noteReminderMode === 'custom' && !noteReminderDate) return;
 
     setIsSavingNote(true);
     try {
-      // 1. Save note to HubSpot
+      // 1. Save note to HubSpot (clears previous open reminder tasks if setting a new reminder)
       const res = await fetch('/api/hubspot/note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealId: deal.id, noteBody: newNoteBody }),
+        body: JSON.stringify({
+          dealId: deal.id,
+          noteBody: newNoteBody,
+          completeFutureReminders: noteReminderMode !== 'none',
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
-      // 2. If 7-day auto-reminder is enabled, create a follow-up task due in 7 days
-      if (autoRemindIn7Days) {
-        const due7Days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      // 2. Schedule follow-up task for either 7 days or chosen future calendar date
+      if (noteReminderMode === '7days') {
+        const due7Days = getOffsetDateString(7);
         await fetch('/api/hubspot/task', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dealId: deal.id,
             subject: `7-Day Check: Follow up on note for ${deal.name}`,
-            body: `Auto-scheduled 7-day review after note: "${newNoteBody.slice(0, 100)}..."`,
+            body: `Auto-scheduled 7-day review after note: "${newNoteBody.slice(0, 120)}${newNoteBody.length > 120 ? '...' : ''}"`,
             dueDate: due7Days,
+            priority: 'HIGH',
+          }),
+        });
+      } else if (noteReminderMode === 'custom' && noteReminderDate) {
+        await fetch('/api/hubspot/task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dealId: deal.id,
+            subject: `Scheduled Reminder: Follow up on note for ${deal.name}`,
+            body: `Scheduled follow-up for ${formatGbDate(noteReminderDate)} after note: "${newNoteBody.slice(0, 120)}${newNoteBody.length > 120 ? '...' : ''}"`,
+            dueDate: noteReminderDate,
             priority: 'HIGH',
           }),
         });
       }
 
       setNewNoteBody('');
+      setNoteReminderMode('7days');
+      setNoteReminderDate(getOffsetDateString(14));
       setShowAddNote(false);
       fetchDetails(deal.id);
       if (onRefreshDeals) onRefreshDeals();
@@ -1015,29 +1056,123 @@ export function DealDrawer({
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white font-sans"
                       />
 
-                      {/* 7-Day Auto Reminder Checkbox (e.g. Marks & Spencer rule) */}
-                      <div className="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs text-slate-700">
-                        <input
-                          type="checkbox"
-                          id="autoRemind7Days"
-                          checked={autoRemindIn7Days}
-                          onChange={(e) => setAutoRemindIn7Days(e.target.checked)}
-                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <label htmlFor="autoRemind7Days" className="cursor-pointer flex items-center space-x-1 font-medium">
-                          <Bell className="h-3.5 w-3.5 text-amber-500" />
-                          <span>Remind me in 7 days if no action scheduled (auto-create 7-day review task in HubSpot)</span>
-                        </label>
+                      {/* Next Reminder Choice: 7-Day Reminder vs Future Calendar Date vs None */}
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <Bell className="h-3.5 w-3.5 text-amber-500" />
+                            <span>Next Reminder</span>
+                          </span>
+                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => setNoteReminderMode('7days')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                                noteReminderMode === '7days'
+                                  ? 'bg-blue-600 text-white shadow-2xs'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              7-Day Reminder
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNoteReminderMode('custom')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1 ${
+                                noteReminderMode === 'custom'
+                                  ? 'bg-indigo-600 text-white shadow-2xs'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              <Calendar className="h-3 w-3" />
+                              <span>Calendar Date</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNoteReminderMode('none')}
+                              className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
+                                noteReminderMode === 'none'
+                                  ? 'bg-slate-700 text-white shadow-2xs'
+                                  : 'text-slate-500 hover:bg-slate-100'
+                              }`}
+                            >
+                              None
+                            </button>
+                          </div>
+                        </div>
+
+                        {noteReminderMode === '7days' && (
+                          <p className="text-[11px] text-slate-600">
+                            Will stay off Daily Clear-Desk Command until <span className="font-bold text-slate-800">{formatGbDate(getOffsetDateString(7))}</span> (7-day review task in HubSpot).
+                          </p>
+                        )}
+
+                        {noteReminderMode === 'custom' && (
+                          <div className="space-y-2 pt-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <input
+                                type="date"
+                                min={getOffsetDateString(1)}
+                                value={noteReminderDate}
+                                onChange={(e) => setNoteReminderDate(e.target.value)}
+                                required
+                                className="bg-white border border-indigo-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                              />
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {[
+                                  { label: '+2 Weeks', days: 14 },
+                                  { label: '+1 Month', days: 30 },
+                                  { label: '+3 Months', days: 90 },
+                                ].map((preset) => {
+                                  const presetVal = getOffsetDateString(preset.days);
+                                  return (
+                                    <button
+                                      key={preset.label}
+                                      type="button"
+                                      onClick={() => setNoteReminderDate(presetVal)}
+                                      className={`px-2 py-1 rounded-md text-[10.5px] font-bold border transition ${
+                                        noteReminderDate === presetVal
+                                          ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      {preset.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            {noteReminderDate && (
+                              <p className="text-[11px] text-indigo-800 font-medium">
+                                Snoozed off Daily Clear-Desk Command — won&apos;t remind you again until <span className="font-bold">{formatGbDate(noteReminderDate)}</span>.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {noteReminderMode === 'none' && (
+                          <p className="text-[11px] text-slate-500">
+                            Logs the note in HubSpot without creating a new reminder task.
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex justify-end">
                         <button
                           type="submit"
-                          disabled={isSavingNote}
+                          disabled={isSavingNote || !newNoteBody.trim() || (noteReminderMode === 'custom' && !noteReminderDate)}
                           className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition disabled:opacity-50"
                         >
                           <Send className="h-3 w-3" />
-                          <span>{isSavingNote ? 'Saving to HubSpot...' : 'Save Note to Deal'}</span>
+                          <span>
+                            {isSavingNote
+                              ? 'Saving to HubSpot...'
+                              : noteReminderMode === 'custom' && noteReminderDate
+                              ? `Save Note & Remind ${formatGbDate(noteReminderDate).split(', ')[1] || noteReminderDate}`
+                              : noteReminderMode === '7days'
+                              ? 'Save Note & Remind in 7d'
+                              : 'Save Note to Deal'}
+                          </span>
                         </button>
                       </div>
                     </form>

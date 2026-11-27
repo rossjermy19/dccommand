@@ -3,7 +3,7 @@ import { addDealNote } from '@/lib/hubspot';
 
 export async function POST(req: Request) {
   try {
-    const { dealId, noteBody } = await req.json();
+    const { dealId, noteBody, completeFutureReminders } = await req.json();
 
     if (!dealId || !noteBody) {
       return NextResponse.json(
@@ -12,7 +12,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await addDealNote(dealId, noteBody);
+    const result = await addDealNote(dealId, noteBody, {
+      completeFutureReminders: !!completeFutureReminders,
+    });
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
     console.error('API /api/hubspot/note error:', error);

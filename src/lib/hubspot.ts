@@ -412,13 +412,16 @@ export async function getOpenDeals(): Promise<Deal[]> {
     endOfToday.setHours(23, 59, 59, 999);
     const endOfTodayMs = endOfToday.getTime();
 
+    // Whether the deal has been touched on today's calendar date (safe across 24h boundary for next-day reminders)
+    const touchedToday = latestTouchTime !== null && latestTouchTime >= startOfTodayMs;
+
     // 1. Task due TODAY: Any open task where the due timestamp falls on today's calendar date
     const taskDueToday = openTasks.find((t) => {
       if (t.due < startOfTodayMs || t.due > endOfTodayMs) return false;
-      // If it is an automated review / 7-day check task, and the deal was already touched today
+      // If it is an automated review / reminder task, and the deal was already touched today
       // (or touch timestamp is on or after the task timestamp), treat it as fulfilled!
-      const isAutoCheck = /7-day check|follow up on note|monthly.*review/i.test(t.subject);
-      if (isAutoCheck && (daysSinceContact === 0 || (latestTouchTime !== null && latestTouchTime >= t.due))) {
+      const isAutoCheck = /7-day check|follow up on note|scheduled reminder|monthly.*review/i.test(t.subject);
+      if (isAutoCheck && (touchedToday || (latestTouchTime !== null && latestTouchTime >= t.due))) {
         return false;
       }
       return true;
@@ -429,8 +432,8 @@ export async function getOpenDeals(): Promise<Deal[]> {
     // or if it is an auto-check and touched today
     const overdueTask = openTasks.find((t) => {
       if (t.due >= startOfTodayMs) return false;
-      const isAutoCheck = /7-day check|follow up on note|monthly.*review/i.test(t.subject);
-      if (isAutoCheck && (daysSinceContact === 0 || (latestTouchTime !== null && latestTouchTime >= t.due))) {
+      const isAutoCheck = /7-day check|follow up on note|scheduled reminder|monthly.*review/i.test(t.subject);
+      if (isAutoCheck && (touchedToday || (latestTouchTime !== null && latestTouchTime >= t.due))) {
         return false;
       }
       if (latestTouchTime !== null && latestTouchTime > (t.due + 24 * 60 * 60 * 1000)) return false;
@@ -828,7 +831,72 @@ export async function getDealDetails(dealId: string): Promise<{
   return { notes, tasks, contacts, emails, meetings, calls };
 }
 
-export async function addDealNote(dealId: string, noteBody: string): Promise<any> {
+/**
+ * Marks open reminder/follow-up tasks on a deal as COMPLETED so snoozed or newly
+ * reminded deals do not prematurely resurface on Daily Clear-Desk Command.
+ */
+export async function completeDealReminderTasks(
+  dealId: string,
+  includeFutureReminders: boolean = false
+): Promise<void> {
+  if (!TOKEN) return;
+
+  try {
+    const tasksAssocRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    if (!tasksAssocRes.ok) return;
+
+    const taskAssoc = await tasksAssocRes.json();
+    const taskIds = (taskAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
+    if (taskIds.length === 0) return;
+
+    const batchReadRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inputs: taskIds,
+        properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
+      }),
+    });
+    if (!batchReadRes.ok) return;
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    const endOfTodayMs = endOfToday.getTime();
+
+    const batchData = await batchReadRes.json();
+    const tasksToComplete = (batchData.results || []).filter((t: any) => {
+      const status = t.properties?.hs_task_status;
+      if (status === 'COMPLETED') return false;
+
+      const subject = t.properties?.hs_task_subject || '';
+      const dueMs = t.properties?.hs_timestamp ? new Date(t.properties.hs_timestamp).getTime() : 0;
+      const isDueTodayOrPast = dueMs > 0 && dueMs <= endOfTodayMs;
+      const isReminderTask = /7-day check|follow up on note|scheduled reminder|follow-up|review/i.test(subject);
+
+      if (includeFutureReminders) {
+        // When explicitly setting a new reminder date, clear previous reminder tasks and any currently due/overdue task
+        return isReminderTask || isDueTodayOrPast;
+      }
+
+      // When logging a note without replacing future reminders, only complete due-today/overdue reminder tasks
+      return isReminderTask && isDueTodayOrPast;
+    });
+
+    for (const t of tasksToComplete) {
+      await updateDealTask(t.id, 'COMPLETED').catch(() => {});
+    }
+  } catch (err) {
+    console.warn('Non-blocking error auto-completing previous reminder tasks:', err);
+  }
+}
+
+export async function addDealNote(
+  dealId: string,
+  noteBody: string,
+  options?: { completeFutureReminders?: boolean }
+): Promise<any> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
   const notePayload = {
@@ -865,39 +933,8 @@ export async function addDealNote(dealId: string, noteBody: string): Promise<any
 
   const result = await response.json();
 
-  // Automatically mark any previous open 7-Day Check or note follow-up tasks on this deal as COMPLETED
-  try {
-    const tasksAssocRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v4/objects/deals/${dealId}/associations/tasks`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    if (tasksAssocRes.ok) {
-      const taskAssoc = await tasksAssocRes.json();
-      const taskIds = (taskAssoc.results || []).map((r: any) => ({ id: r.toObjectId }));
-      if (taskIds.length > 0) {
-        const batchReadRes = await hubspotFetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/tasks/batch/read`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inputs: taskIds,
-            properties: ['hs_task_subject', 'hs_task_status', 'hs_timestamp'],
-          }),
-        });
-        if (batchReadRes.ok) {
-          const batchData = await batchReadRes.json();
-          const tasksToComplete = (batchData.results || []).filter((t: any) => {
-            const status = t.properties?.hs_task_status;
-            const subject = t.properties?.hs_task_subject || '';
-            return status !== 'COMPLETED' && /7-day check|follow up on note|review/i.test(subject);
-          });
-          for (const t of tasksToComplete) {
-            await updateDealTask(t.id, 'COMPLETED').catch(() => {});
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Non-blocking error auto-completing previous check tasks:', err);
-  }
+  // Automatically mark obsolete open reminder/check tasks on this deal as COMPLETED
+  await completeDealReminderTasks(dealId, !!options?.completeFutureReminders);
 
   return result;
 }
@@ -909,11 +946,22 @@ export async function createDealTask(
     body?: string;
     dueDate: string; // ISO string or YYYY-MM-DD
     priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    completeExistingReminders?: boolean;
   }
 ): Promise<any> {
   if (!TOKEN) throw new Error('HUBSPOT_ACCESS_TOKEN is not configured.');
 
-  const dueTimestamp = new Date(task.dueDate).getTime().toString();
+  // If rescheduling/snoozing a reminder, clear previous open reminders & due-today/overdue tasks first
+  if (task.completeExistingReminders) {
+    await completeDealReminderTasks(dealId, true);
+  }
+
+  // Normalise date-only strings (YYYY-MM-DD) to 09:00 UTC so they always fall cleanly on the chosen calendar day
+  const trimmedDue = task.dueDate.trim();
+  const normalisedDueDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmedDue)
+    ? `${trimmedDue}T09:00:00.000Z`
+    : trimmedDue;
+  const dueTimestamp = new Date(normalisedDueDate).getTime().toString();
 
   const payload = {
     properties: {
